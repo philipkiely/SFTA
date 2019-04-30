@@ -8,6 +8,7 @@ from rest_framework.status import HTTP_400_BAD_REQUEST
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
 from .decorators import define_usage
+from .models import File, AccessController, Profile
 
 
 #path('/', views.api_index, name='api_index'),
@@ -39,6 +40,8 @@ def api_signup(request):
     user = User.objects.create_user(username, email, password)
     user.save()
     user = authenticate(username=username, password=password)
+    user_profile = Profile(user=user, server_msn=0, client_msn=0)
+    user_profile.save()
     if user is not None:
         token, _ = Token.objects.get_or_create(user=user)
         return Response({'authenticated': True, 'token': "Token " + token.key})
@@ -66,55 +69,78 @@ def api_signin(request):
         return Response({'authenticated': False, 'token': None})
 
 
+#checking client msn
+def check_client_msn(request):
+    if int(request.data['client_msn']) <= request.user.profile.client_msn:
+        return False
+    request.user.profile.client_msn = int(request.data['client_msn'])
+    user.profile.save()
+    return True
+
+
 #path('my_files/', views.api_my_files, name='api_my_files'),
-@define_usage(returns={'file_metadata': 'Dict'})
-@api_view(['GET'])
+@define_usage(params={'client_msn': 'Integer'}, returns={'file_metadata': 'Dict'})
+@api_view(['POST'])
 @authentication_classes((SessionAuthentication, BasicAuthentication, TokenAuthentication))
 @permission_classes((IsAuthenticated,))
 def api_my_files(request):
-    pass
+    if not check_client_msn(request):
+        return Response({'error': 'error'})
+    file_list = File.objects.get(owner=request.user) # return list of filenames owned by user -- dictionary eventually, return query set
+    return Response(file_list)
 
 
 #path('my_access/', views.api_my_access, name='api_my_access'),
-@define_usage(returns={'file_metadata': 'Dict'})
-@api_view(['GET'])
+@define_usage(params={'client_msn': 'Integer'}, returns={'file_metadata': 'Dict'})
+@api_view(['POST'])
 @authentication_classes((SessionAuthentication, BasicAuthentication, TokenAuthentication))
 @permission_classes((IsAuthenticated,))
 def api_my_access(request):
-    pass
+    if not check_client_msn(request):
+        return Response({'error': 'error'})
+    access_list = AccessController.objects.get(owner=request.user)
+    return Response(access_list)
 
 
 #path('upload/', views.api_upload, name='api_upload'),
-@define_usage(params={'file': 'File'}, returns={'file_metadata': 'Dict'})
+@define_usage(params={'file': 'File', 'client_msn': 'Integer'}, returns={'file_metadata': 'Dict'})
 @api_view(['POST'])
 @authentication_classes((SessionAuthentication, BasicAuthentication, TokenAuthentication))
 @permission_classes((IsAuthenticated,))
 def api_upload(request):
+    if not check_client_msn(request):
+        return Response({'error': 'error'})
     pass
 
 
 #path('download/', views.api_download, name='api_download'),
-@define_usage(params={'file_id': 'Int'}, returns={'file': 'File'})
+@define_usage(params={'file_id': 'Int', 'client_msn': 'Integer'}, returns={'file': 'File'})
 @api_view(['POST'])
 @authentication_classes((SessionAuthentication, BasicAuthentication, TokenAuthentication))
 @permission_classes((IsAuthenticated,))
 def api_download(request):
+    if not check_client_msn(request):
+        return Response({'error': 'error'})
     pass
 
 
 #path('share/', views.api_share, name='api_share'),
-@define_usage(params={'file_id': 'Int', 'file_key': 'String', 'user_email': 'String'}, returns={'file_metadata': 'Dict'})
+@define_usage(params={'file_id': 'Int', 'file_key': 'String', 'user_email': 'String', 'client_msn': 'Integer'}, returns={'file_metadata': 'Dict'})
 @api_view(['POST'])
 @authentication_classes((SessionAuthentication, BasicAuthentication, TokenAuthentication))
 @permission_classes((IsAuthenticated,))
 def api_share(request):
+    if not check_client_msn(request):
+        return Response({'error': 'error'})
     pass
 
 
 #path('revoke/', views.api_revoke, name='api_revoke'),
-@define_usage(params={'file_id': 'Int', 'user_email': 'String'}, returns={'file_metadata': 'Dict'})
+@define_usage(params={'file_id': 'Int', 'user_email': 'String', 'client_msn': 'Integer'}, returns={'file_metadata': 'Dict'})
 @api_view(['POST'])
 @authentication_classes((SessionAuthentication, BasicAuthentication, TokenAuthentication))
 @permission_classes((IsAuthenticated,))
 def api_revoke(request):
+    if not check_client_msn(request):
+        return Response({'error': 'error'})
     pass
