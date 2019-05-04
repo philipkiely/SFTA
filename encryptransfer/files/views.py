@@ -1,5 +1,6 @@
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.parsers import FileUploadParser
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from rest_framework.authentication import SessionAuthentication, BasicAuthentication, TokenAuthentication
 from rest_framework.reverse import reverse
@@ -86,7 +87,7 @@ def check_client_msn(request):
 def api_my_files(request):
     if not check_client_msn(request):
         return Response({'error': 'error'})
-    file_list = File.objects.get(owner=request.user) # return list of filenames owned by user -- dictionary eventually, return query set
+    file_list = request.user.file_set.all()
     return Response(file_list)
 
 
@@ -98,19 +99,22 @@ def api_my_files(request):
 def api_my_access(request):
     if not check_client_msn(request):
         return Response({'error': 'error'})
-    access_list = AccessController.objects.get(owner=request.user)
+    access_list =request.user.accesscontroller_set.all()
     return Response(access_list)
 
 
 #path('upload/', views.api_upload, name='api_upload'),
-@define_usage(params={'file': 'File', 'client_msn': 'Integer'}, returns={'file_metadata': 'Dict'})
+@define_usage(params={'file': 'File', 'client_msn': 'Integer'}, returns={'success': 'Boolean'})
 @api_view(['POST'])
 @authentication_classes((SessionAuthentication, BasicAuthentication, TokenAuthentication))
 @permission_classes((IsAuthenticated,))
 def api_upload(request):
     if not check_client_msn(request):
         return Response({'error': 'error'})
-    pass
+    f = request.data['file']
+    new_file = File(request.user, f)
+    new_file.save()
+    return Response({'success', 'True'})
 
 
 #path('download/', views.api_download, name='api_download'),
