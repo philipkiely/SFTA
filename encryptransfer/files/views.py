@@ -99,7 +99,7 @@ def api_my_files(request):
 def api_my_access(request):
     if not check_client_msn(request):
         return Response({'error': 'error'})
-    access_list =request.user.accesscontroller_set.all()
+    access_list = request.user.accesscontroller_set.all()
     return Response(access_list)
 
 

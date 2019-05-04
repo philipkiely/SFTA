@@ -1,9 +1,7 @@
 # Created by https://www.gitignore.io
 
-SMSJournal/*.pickle
-SMSJournal/credentials.json
-*.pickle
-credentials.json
+media/
+media/files
 
 ### OSX ###
 .DS_Store
