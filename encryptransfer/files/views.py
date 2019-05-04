@@ -74,7 +74,7 @@ def check_client_msn(request):
     if int(request.data['client_msn']) <= request.user.profile.client_msn:
         return False
     request.user.profile.client_msn = int(request.data['client_msn'])
-    user.profile.save()
+    request.user.profile.save()
     return True
 
 
