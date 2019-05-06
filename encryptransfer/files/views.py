@@ -79,6 +79,15 @@ def check_client_msn(request):
     return True
 
 
+#wrapper for Response, introduces sequence numbers #TODO encryption and mac
+def protected_response(request, data):
+    new_server_msn = request.user.profile.server_msn + 1
+    data["server_msn"] = new_server_msn
+    request.user.profile.server_msn = new_server_msn
+    request.user.profile.save()
+    return Response(data)
+
+
 #path('my_files/', views.api_my_files, name='api_my_files'),
 @define_usage(params={'client_msn': 'Integer'}, returns={'file_metadata': 'Dict'})
 @api_view(['POST'])
@@ -86,9 +95,9 @@ def check_client_msn(request):
 @permission_classes((IsAuthenticated,))
 def api_my_files(request):
     if not check_client_msn(request):
-        return Response({'error': 'error'})
-    file_list = request.user.file_set.all()
-    return Response(file_list)
+        return protected_response(request, {'error': 'error'})
+    file_list = dict(request.user.file_set.all())
+    return protected_response(request, file_list)
 
 
 #path('my_access/', views.api_my_access, name='api_my_access'),
@@ -98,9 +107,9 @@ def api_my_files(request):
 @permission_classes((IsAuthenticated,))
 def api_my_access(request):
     if not check_client_msn(request):
-        return Response({'error': 'error'})
-    access_list = request.user.accesscontroller_set.all()
-    return Response(access_list)
+        return protected_response(request, {'error': 'error'})
+    access_list = dict(request.user.accesscontroller_set.all())
+    return protected_response(request, access_list)
 
 
 #path('upload/', views.api_upload, name='api_upload'),
@@ -110,11 +119,11 @@ def api_my_access(request):
 @permission_classes((IsAuthenticated,))
 def api_upload(request):
     if not check_client_msn(request):
-        return Response({'error': 'error'})
+        return protected_response(request, {'error': 'error'})
     f = request.data['file']
     new_file = File(request.user, f)
     new_file.save()
-    return Response({'success', 'True'})
+    return protected_response(request, {'success', 'True'})
 
 
 #path('download/', views.api_download, name='api_download'),
@@ -124,7 +133,7 @@ def api_upload(request):
 @permission_classes((IsAuthenticated,))
 def api_download(request):
     if not check_client_msn(request):
-        return Response({'error': 'error'})
+        return protected_response(request, {'error': 'error'})
     pass
 
 
@@ -135,7 +144,7 @@ def api_download(request):
 @permission_classes((IsAuthenticated,))
 def api_share(request):
     if not check_client_msn(request):
-        return Response({'error': 'error'})
+        return protected_response(request, {'error': 'error'})
     pass
 
 
@@ -146,5 +155,5 @@ def api_share(request):
 @permission_classes((IsAuthenticated,))
 def api_revoke(request):
     if not check_client_msn(request):
-        return Response({'error': 'error'})
+        return protected_response(request, {'error': 'error'})
     pass
