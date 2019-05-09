@@ -11,6 +11,10 @@ from django.contrib.auth.models import User
 from .decorators import define_usage
 from .models import File, AccessController, Profile
 
+from Crypto.Cipher import PKCS1_v1_5
+from Crypto.PublicKey import RSA
+from Crypto.Hash import SHA256256
+
 
 #path('/', views.api_index, name='api_index'),
 @define_usage(returns={"url_usage": "Dict"})
@@ -25,6 +29,8 @@ def api_index(request):
     return Response(details)
 
 
+# Encrypt request.data and Response
+
 #path('signup/', views.api_signup, name='api_signup'),
 @define_usage(params={"email": "String", "username": "String", "password": "String"},
               returns={'authenticated': 'Bool', 'token': 'Token String'})
@@ -38,6 +44,13 @@ def api_signup(request):
     except:
         return Response({'error': 'Please provide correct email, username, and password'},
                         status=HTTP_400_BAD_REQUEST)
+
+    # encrypting request.data with RSA
+    h_request = SHA256.new(request.data)
+    enc_key_request = RSA.importKey('pubkey')
+    cipher_request = PKCS1_v1_5.new(enc_key_request)
+    enc_request_RSA = cipher_request.encrypt(request.data+h_request.digest())
+
     user = User.objects.create_user(username, email, password)
     user.save()
     user = authenticate(username=username, password=password)
@@ -45,8 +58,24 @@ def api_signup(request):
     user_profile.save()
     if user is not None:
         token, _ = Token.objects.get_or_create(user=user)
+
+        # encrypting true response
+        true_response_dict = {'authenticated': True, 'token': "Token " + token.key}
+        true_response_h = SHA256.new(true_response_dict)
+        true_response_enc_key = RSA.importKey('pubkey2')
+        true_response_cipher = PKCS1_v1_5.new(true_response_enc_key)
+        true_response_enc_RSA = true_response_cipher.encrypt(true_response_dict + true_response_h.digest())
+
         return Response({'authenticated': True, 'token': "Token " + token.key})
     else:
+
+        # encrypting false response
+        false_response_dict = {'authenticated': False, 'token': None}
+        false_response_h = SHA256.new(false_response_dict)
+        false_response_enc_key = RSA.importKey('pubkey3')
+        false_response_cipher = PKCS1_v1_5.new(false_response_enc_key)
+        false_response_enc_RSA = false_response_cipher.encrypt(false_response_dict + false_response_h.digest())
+
         return Response({'authenticated': False, 'token': None})
 
 
@@ -63,10 +92,31 @@ def api_signin(request):
         return Response({'error': 'Please provide correct username and password'},
                         status=HTTP_400_BAD_REQUEST)
     user = authenticate(username=username, password=password)
+
+    # encrypting request.data with RSA
+    h_request = SHA256.new(request.data)
+    enc_key_request = RSA.importKey('pubkey4')
+    cipher_request = PKCS1_v1_5.new(enc_key_request)
+    enc_request_RSA = cipher_request.encrypt(request.data+h_request.digest())
+
     if user is not None:
         token, _ = Token.objects.get_or_create(user=user)
+
+        # encrypting true response
+        true_response_dict = {'authenticated': True, 'token': "Token " + token.key}
+        true_response_h = SHA256.new(true_response_dict)
+        true_response_enc_key = RSA.importKey('pubkey5')
+        true_response_cipher = PKCS1_v1_5.new(true_response_enc_key)
+        true_response_enc_RSA = true_response_cipher.encrypt(true_response_dict + true_response_h.digest())
+
         return Response({'authenticated': True, 'token': "Token " + token.key})
     else:
+        false_response_dict = {'authenticated': False, 'token': None}
+        false_response_h = SHA256.new(false_response_dict)
+        false_response_enc_key = RSA.importKey('pubkey6')
+        false_response_cipher = PKCS1_v1_5.new(false_response_enc_key)
+        false_response_enc_RSA = false_response_cipher.encrypt(false_response_dict + false_response_h.digest())
+
         return Response({'authenticated': False, 'token': None})
 
 
