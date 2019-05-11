@@ -5,6 +5,7 @@ from rest_framework.authentication import SessionAuthentication, BasicAuthentica
 from rest_framework.reverse import reverse
 from rest_framework.authtoken.models import Token
 from rest_framework.status import HTTP_400_BAD_REQUEST
+from ratelimit.decorators import ratelimit
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
 from django.conf import settings
@@ -14,7 +15,12 @@ import os
 import mimetypes
 
 
+#TODO: Rate Limit
+#TODO: MAC on responses
+#TODO: Encrypt files
+
 #path('/', views.api_index, name='api_index'),
+@ratelimit(key='ip', rate='1/s')
 @define_usage(returns={"url_usage": "Dict"})
 @api_view(["GET"])
 @permission_classes((AllowAny,))
@@ -28,6 +34,7 @@ def api_index(request):
 
 
 #path('signup/', views.api_signup, name='api_signup'),
+@ratelimit(key='ip', rate='1/s')
 @define_usage(params={"email": "String", "username": "String", "password": "String"},
               returns={'authenticated': 'Bool', 'token': 'Token String'})
 @api_view(["POST"])
@@ -53,6 +60,7 @@ def api_signup(request):
 
 
 #path('signin/', views.api_signin, name='api_signin'),
+@ratelimit(key='ip', rate='1/s')
 @define_usage(params={"username": "String", "password": "String"},
               returns={'authenticated': 'Bool', 'token': 'Token String'})
 @api_view(["POST"])
@@ -91,6 +99,7 @@ def protected_response(request, data):
 
 
 #path('my_files/', views.api_my_files, name='api_my_files'),
+@ratelimit(key='ip', rate='1/s')
 @define_usage(params={'client_msn': 'Integer'}, returns={'file_metadata': 'Dict'})
 @api_view(['POST'])
 @authentication_classes((SessionAuthentication, BasicAuthentication, TokenAuthentication))
@@ -103,6 +112,7 @@ def api_my_files(request):
 
 
 #path('my_access/', views.api_my_access, name='api_my_access'),
+@ratelimit(key='ip', rate='1/s')
 @define_usage(params={'client_msn': 'Integer'}, returns={'file_metadata': 'Dict'})
 @api_view(['POST'])
 @authentication_classes((SessionAuthentication, BasicAuthentication, TokenAuthentication))
@@ -115,6 +125,7 @@ def api_my_access(request):
 
 
 #path('upload/', views.api_upload, name='api_upload'),
+@ratelimit(key='ip', rate='1/s')
 @define_usage(params={'file': 'File', 'client_msn': 'Integer'}, returns={'success': 'Boolean', 'fileID': 'String'})
 @api_view(['POST'])
 @authentication_classes((SessionAuthentication, BasicAuthentication, TokenAuthentication))
@@ -128,6 +139,7 @@ def api_upload(request):
 
 
 #path('download/', views.api_download, name='api_download'),
+@ratelimit(key='ip', rate='1/s')
 @define_usage(params={'fileID': 'Int', 'client_msn': 'Integer'}, returns={'file': 'File'})
 @api_view(['POST'])
 @authentication_classes((SessionAuthentication, BasicAuthentication, TokenAuthentication))
@@ -147,17 +159,18 @@ def api_download(request):
     else:
         try:
             ac = AccessController.objects.get(user=request.user, file=f)
-            data = f.file.read() #in production this would instead be handled by Apache
-            f.file.close()
-            response = Response(data, content_type=mimetypes.guess_type(settings.MEDIA_ROOT + f.file.name)[0])
-            response['Content-Disposition'] = "attachment; filename={0}".format(f.file)
-            response['Content-Length'] = f.file.size
+            data = ac.file.file.read() #in production this would instead be handled by Apache
+            ac.file.file.close()
+            response = Response(data, content_type=mimetypes.guess_type(settings.MEDIA_ROOT + ac.file.file.name)[0])
+            response['Content-Disposition'] = "attachment; filename={0}".format(ac.file.file)
+            response['Content-Length'] = ac.file.file.size
             return response
         except:
             return protected_response(request, {'success': 'False', 'fileID': 'You cannot access this file'})
 
 
 #path('share/', views.api_share, name='api_share'),
+@ratelimit(key='ip', rate='1/s')
 @define_usage(params={'file_id': 'Int', 'file_key': 'String', 'email': 'String', 'client_msn': 'Integer'}, returns={'success': 'Boolean'})
 @api_view(['POST'])
 @authentication_classes((SessionAuthentication, BasicAuthentication, TokenAuthentication))
@@ -173,6 +186,7 @@ def api_share(request):
 
 
 #path('revoke/', views.api_revoke, name='api_revoke'),
+@ratelimit(key='ip', rate='1/s')
 @define_usage(params={'file_id': 'Int', 'email': 'String', 'client_msn': 'Integer'}, returns={'success': 'Boolean'})
 @api_view(['POST'])
 @authentication_classes((SessionAuthentication, BasicAuthentication, TokenAuthentication))
