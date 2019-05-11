@@ -144,8 +144,17 @@ def api_download(request):
         response['Content-Length'] = f.file.size
         return response
         #return protected_response(request, {'success': 'True', 'fileID': f.id})
-    else: #TODO: access control
-        return protected_response(request, {'success': 'False', 'fileID': 'You do not own this file'})
+    else:
+        try:
+            ac = AccessController.objects.get(user=request.user, file=f)
+            data = f.file.read() #in production this would instead be handled by Apache
+            f.file.close()
+            response = Response(data, content_type=mimetypes.guess_type(settings.MEDIA_ROOT + f.file.name)[0])
+            response['Content-Disposition'] = "attachment; filename={0}".format(f.file)
+            response['Content-Length'] = f.file.size
+            return response
+        except:
+            return protected_response(request, {'success': 'False', 'fileID': 'You cannot access this file'})
 
 
 #path('share/', views.api_share, name='api_share'),
