@@ -1,6 +1,5 @@
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.parsers import FileUploadParser
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from rest_framework.authentication import SessionAuthentication, BasicAuthentication, TokenAuthentication
 from rest_framework.reverse import reverse
@@ -8,8 +7,11 @@ from rest_framework.authtoken.models import Token
 from rest_framework.status import HTTP_400_BAD_REQUEST
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
+from django.conf import settings
 from .decorators import define_usage
 from .models import File, AccessController, Profile
+import os
+import mimetypes
 
 
 #path('/', views.api_index, name='api_index'),
@@ -126,14 +128,24 @@ def api_upload(request):
 
 
 #path('download/', views.api_download, name='api_download'),
-@define_usage(params={'file_id': 'Int', 'client_msn': 'Integer'}, returns={'file': 'File'})
+@define_usage(params={'fileID': 'Int', 'client_msn': 'Integer'}, returns={'file': 'File'})
 @api_view(['POST'])
 @authentication_classes((SessionAuthentication, BasicAuthentication, TokenAuthentication))
 @permission_classes((IsAuthenticated,))
 def api_download(request):
     if not check_client_msn(request):
         return protected_response(request, {'error': 'error'})
-    pass
+    f = File.objects.get(id=request.data['fileID'])
+    if f.owner == request.user:
+        data = f.file.read() #in production this would instead be handled by Apache
+        f.file.close()
+        response = Response(data, content_type=mimetypes.guess_type(settings.MEDIA_ROOT + f.file.name)[0])
+        response['Content-Disposition'] = "attachment; filename={0}".format(f.file)
+        response['Content-Length'] = f.file.size
+        return response
+        #return protected_response(request, {'success': 'True', 'fileID': f.id})
+    else: #TODO: access control
+        return protected_response(request, {'success': 'False', 'fileID': 'You do not own this file'})
 
 
 #path('share/', views.api_share, name='api_share'),

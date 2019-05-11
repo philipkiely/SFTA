@@ -88,9 +88,10 @@ def my_access():
     state["client_msn"] = state["client_msn"] + 1
     data = {"client_msn": state["client_msn"]}
     headers = {"Authorization": state["token"]}
-
+    r = requests.post("http://localhost:8000/my_access/", headers=headers, data=data).json()
     if not check_server_msn(int(r["server_msn"])):
         return
+    print(r)
 
 
 #path('upload/', views.api_upload, name='api_upload'),
@@ -112,10 +113,19 @@ def upload():
 def download():
     global state
     state["client_msn"] = state["client_msn"] + 1
-    data = {"client_msn": state["client_msn"]}
-    if not check_server_msn(int(r["server_msn"])):
-        return
-
+    print("ID of file you want to download")
+    fileID = int(input())
+    data = {"client_msn": state["client_msn"], "fileID": fileID}
+    headers = {"Authorization": state["token"]}
+    r = requests.post("http://localhost:8000/download/", headers=headers, data=data, stream=True)
+    #if not check_server_msn(int(r["server_msn"])):
+    #    return
+    print("Save As:")
+    save_path = input()
+    with open(save_path, "wb") as f:
+        for chunk in r.iter_content(1024):
+            f.write(chunk)
+    return
 
 #path('share/', views.api_share, name='api_share'),
 def share():
