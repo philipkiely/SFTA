@@ -127,22 +127,37 @@ def download():
             f.write(chunk)
     return
 
+
 #path('share/', views.api_share, name='api_share'),
 def share():
     global state
     state["client_msn"] = state["client_msn"] + 1
-    data = {"client_msn": state["client_msn"]}
+    headers = {"Authorization": state["token"]}
+    print("FileID that you want to share")
+    fileID = int(input())
+    print("Email of user to share with")
+    email = input()
+    data = {"client_msn": state["client_msn"], "fileID": fileID, "email": email}
+    r = requests.post("http://localhost:8000/share/", headers=headers, data=data).json()
     if not check_server_msn(int(r["server_msn"])):
         return
+    print(r)
 
 
 #path('revoke/', views.api_revoke, name='api_revoke'),
 def revoke():
     global state
     state["client_msn"] = state["client_msn"] + 1
-    data = {"client_msn": state["client_msn"]}
+    headers = {"Authorization": state["token"]}
+    print("FileID that you want to revoke")
+    fileID = int(input())
+    print("Email of user to revoke from")
+    email = input()
+    data = {"client_msn": state["client_msn"], "fileID": fileID, "email": email}
+    r = requests.post("http://localhost:8000/revoke/", headers=headers, data=data).json()
     if not check_server_msn(int(r["server_msn"])):
         return
+    print(r)
 
 
 def client():

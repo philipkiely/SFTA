@@ -149,22 +149,30 @@ def api_download(request):
 
 
 #path('share/', views.api_share, name='api_share'),
-@define_usage(params={'file_id': 'Int', 'file_key': 'String', 'user_email': 'String', 'client_msn': 'Integer'}, returns={'file_metadata': 'Dict'})
+@define_usage(params={'file_id': 'Int', 'file_key': 'String', 'email': 'String', 'client_msn': 'Integer'}, returns={'success': 'Boolean'})
 @api_view(['POST'])
 @authentication_classes((SessionAuthentication, BasicAuthentication, TokenAuthentication))
 @permission_classes((IsAuthenticated,))
 def api_share(request):
     if not check_client_msn(request):
         return protected_response(request, {'error': 'error'})
-    pass
+    f = File.objects.get(id=request.data['fileID'])
+    if f.owner == request.user:
+        ac = AccessController(user=User.objects.get(email=request.data["email"]), file=f)
+        ac.save()
+    return protected_response(request, {'success': 'True'})
 
 
 #path('revoke/', views.api_revoke, name='api_revoke'),
-@define_usage(params={'file_id': 'Int', 'user_email': 'String', 'client_msn': 'Integer'}, returns={'file_metadata': 'Dict'})
+@define_usage(params={'file_id': 'Int', 'email': 'String', 'client_msn': 'Integer'}, returns={'success': 'Boolean'})
 @api_view(['POST'])
 @authentication_classes((SessionAuthentication, BasicAuthentication, TokenAuthentication))
 @permission_classes((IsAuthenticated,))
 def api_revoke(request):
     if not check_client_msn(request):
         return protected_response(request, {'error': 'error'})
-    pass
+    f = File.objects.get(id=request.data['fileID'])
+    if f.owner == request.user:
+        ac = AccessController.objects.get(user=User.objects.get(email=request.data["email"]), file=f)
+        ac.delete()
+    return protected_response(request, {'success': 'True'})
