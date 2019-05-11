@@ -113,17 +113,16 @@ def api_my_access(request):
 
 
 #path('upload/', views.api_upload, name='api_upload'),
-@define_usage(params={'file': 'File', 'client_msn': 'Integer'}, returns={'success': 'Boolean'})
+@define_usage(params={'file': 'File', 'client_msn': 'Integer'}, returns={'success': 'Boolean', 'fileID': 'String'})
 @api_view(['POST'])
 @authentication_classes((SessionAuthentication, BasicAuthentication, TokenAuthentication))
 @permission_classes((IsAuthenticated,))
 def api_upload(request):
     if not check_client_msn(request):
         return protected_response(request, {'error': 'error'})
-    f = request.data['file']
-    new_file = File(request.user, f)
+    new_file = File(owner=request.user, file=request.FILES.get('file'))
     new_file.save()
-    return protected_response(request, {'success', 'True'})
+    return protected_response(request, {'success': 'True', 'fileID': new_file.id})
 
 
 #path('download/', views.api_download, name='api_download'),

@@ -4,7 +4,6 @@ import ast
 
 def save_state():
     global state
-    print(state)
     with open("state.txt", "w") as f:
         f.write(str(state))
     
@@ -50,7 +49,6 @@ def signup():
         print("here here")
         state["authenticated"] = True
         state["token"] = r["token"]
-    print(state)
     return
 
 
@@ -89,6 +87,8 @@ def my_access():
     global state
     state["client_msn"] = state["client_msn"] + 1
     data = {"client_msn": state["client_msn"]}
+    headers = {"Authorization": state["token"]}
+
     if not check_server_msn(int(r["server_msn"])):
         return
 
@@ -98,9 +98,15 @@ def upload():
     global state
     state["client_msn"] = state["client_msn"] + 1
     data = {"client_msn": state["client_msn"]}
+    print("path to file you want to upload")
+    path = input()
+    files = {'file': open(path, 'rb')}
+    headers = {"Authorization": state["token"]}
+    r = requests.post("http://localhost:8000/upload/", headers=headers, data=data, files=files).json()
     if not check_server_msn(int(r["server_msn"])):
         return
-
+    print(r)
+    
 
 #path('download/', views.api_download, name='api_download'),
 def download():
