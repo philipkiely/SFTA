@@ -1,15 +1,18 @@
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.parsers import FileUploadParser
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from rest_framework.authentication import SessionAuthentication, BasicAuthentication, TokenAuthentication
 from rest_framework.reverse import reverse
 from rest_framework.authtoken.models import Token
 from rest_framework.status import HTTP_400_BAD_REQUEST
+from ratelimit.decorators import ratelimit
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
+from django.http import HttpResponse
+from django.conf import settings
 from .decorators import define_usage
 from .models import File, AccessController, Profile
+import mimetypes
 
 import os.path
 from Crypto.PublicKey import RSA
@@ -18,7 +21,12 @@ from Crypto.Cipher import AES, PKCS1_OAEP
 import ast
 
 
+
+#TODO: MAC on responses
+#TODO: Encrypt files
+
 #path('/', views.api_index, name='api_index'),
+@ratelimit(key='ip', rate='1/s')
 @define_usage(returns={"url_usage": "Dict"})
 @api_view(["GET"])
 @permission_classes((AllowAny,))
@@ -31,6 +39,7 @@ def api_index(request):
     return Response(details)
 
 #path('signup/', views.api_signup, name='api_signup'),
+@ratelimit(key='ip', rate='1/s')
 @define_usage(params={"email": "String", "username": "String", "password": "String"},
               returns={'authenticated': 'Bool', 'token': 'Token String'})
 @api_view(["POST"])
@@ -86,6 +95,7 @@ def api_signup(request):
 
 
 #path('signin/', views.api_signin, name='api_signin'),
+@ratelimit(key='ip', rate='1/s')
 @define_usage(params={"username": "String", "password": "String"},
               returns={'authenticated': 'Bool', 'token': 'Token String'})
 @api_view(["POST"])
@@ -203,6 +213,7 @@ def protected_response(request, data):
 
 
 #path('my_files/', views.api_my_files, name='api_my_files'),
+@ratelimit(key='ip', rate='1/s')
 @define_usage(params={'client_msn': 'Integer'}, returns={'file_metadata': 'Dict'})
 @api_view(['POST'])
 @authentication_classes((SessionAuthentication, BasicAuthentication, TokenAuthentication))
@@ -215,6 +226,7 @@ def api_my_files(request):
 
 
 #path('my_access/', views.api_my_access, name='api_my_access'),
+@ratelimit(key='ip', rate='1/s')
 @define_usage(params={'client_msn': 'Integer'}, returns={'file_metadata': 'Dict'})
 @api_view(['POST'])
 @authentication_classes((SessionAuthentication, BasicAuthentication, TokenAuthentication))
@@ -227,47 +239,77 @@ def api_my_access(request):
 
 
 #path('upload/', views.api_upload, name='api_upload'),
-@define_usage(params={'file': 'File', 'client_msn': 'Integer'}, returns={'success': 'Boolean'})
+@ratelimit(key='ip', rate='1/s')
+@define_usage(params={'file': 'File', 'client_msn': 'Integer'}, returns={'success': 'Boolean', 'fileID': 'String'})
 @api_view(['POST'])
 @authentication_classes((SessionAuthentication, BasicAuthentication, TokenAuthentication))
 @permission_classes((IsAuthenticated,))
 def api_upload(request):
     if not check_client_msn(request):
         return protected_response(request, {'error': 'error'})
-    f = request.data['file']
-    new_file = File(request.user, f)
+    new_file = File(owner=request.user, file=request.FILES.get('file'))
     new_file.save()
-    return protected_response(request, {'success', 'True'})
+    return protected_response(request, {'success': 'True', 'fileID': new_file.id})
 
 
 #path('download/', views.api_download, name='api_download'),
-@define_usage(params={'file_id': 'Int', 'client_msn': 'Integer'}, returns={'file': 'File'})
+@ratelimit(key='ip', rate='1/s')
+@define_usage(params={'fileID': 'Int', 'client_msn': 'Integer'}, returns={'file': 'File'})
 @api_view(['POST'])
 @authentication_classes((SessionAuthentication, BasicAuthentication, TokenAuthentication))
 @permission_classes((IsAuthenticated,))
 def api_download(request):
     if not check_client_msn(request):
         return protected_response(request, {'error': 'error'})
-    pass
+    f = File.objects.get(id=request.data['fileID'])
+    if f.owner == request.user:
+        data = f.file.read() #in production this would instead be handled by Apache
+        f.file.close()
+        response = HttpResponse(data, content_type=mimetypes.guess_type(settings.MEDIA_ROOT + f.file.name)[0])
+        response['Content-Disposition'] = "attachment; filename={0}".format(f.file)
+        response['Content-Length'] = f.file.size
+        return response
+        #return protected_response(request, {'success': 'True', 'fileID': f.id})
+    else:
+        try:
+            ac = AccessController.objects.get(user=request.user, file=f)
+            data = ac.file.file.read() #in production this would instead be handled by Apache
+            ac.file.file.close()
+            response = Response(data, content_type=mimetypes.guess_type(settings.MEDIA_ROOT + ac.file.file.name)[0])
+            response['Content-Disposition'] = "attachment; filename={0}".format(ac.file.file)
+            response['Content-Length'] = ac.file.file.size
+            return response
+        except:
+            return protected_response(request, {'success': 'False', 'fileID': 'You cannot access this file'})
 
 
 #path('share/', views.api_share, name='api_share'),
-@define_usage(params={'file_id': 'Int', 'file_key': 'String', 'user_email': 'String', 'client_msn': 'Integer'}, returns={'file_metadata': 'Dict'})
+@ratelimit(key='ip', rate='1/s')
+@define_usage(params={'file_id': 'Int', 'file_key': 'String', 'email': 'String', 'client_msn': 'Integer'}, returns={'success': 'Boolean'})
 @api_view(['POST'])
 @authentication_classes((SessionAuthentication, BasicAuthentication, TokenAuthentication))
 @permission_classes((IsAuthenticated,))
 def api_share(request):
     if not check_client_msn(request):
         return protected_response(request, {'error': 'error'})
-    pass
+    f = File.objects.get(id=request.data['fileID'])
+    if f.owner == request.user:
+        ac = AccessController(user=User.objects.get(email=request.data["email"]), file=f)
+        ac.save()
+    return protected_response(request, {'success': 'True'})
 
 
 #path('revoke/', views.api_revoke, name='api_revoke'),
-@define_usage(params={'file_id': 'Int', 'user_email': 'String', 'client_msn': 'Integer'}, returns={'file_metadata': 'Dict'})
+@ratelimit(key='ip', rate='1/s')
+@define_usage(params={'file_id': 'Int', 'email': 'String', 'client_msn': 'Integer'}, returns={'success': 'Boolean'})
 @api_view(['POST'])
 @authentication_classes((SessionAuthentication, BasicAuthentication, TokenAuthentication))
 @permission_classes((IsAuthenticated,))
 def api_revoke(request):
     if not check_client_msn(request):
         return protected_response(request, {'error': 'error'})
-    pass
+    f = File.objects.get(id=request.data['fileID'])
+    if f.owner == request.user:
+        ac = AccessController.objects.get(user=User.objects.get(email=request.data["email"]), file=f)
+        ac.delete()
+    return protected_response(request, {'success': 'True'})

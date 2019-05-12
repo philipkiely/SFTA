@@ -8,6 +8,7 @@ server_pub_key.pem
 state.txt
 media/
 media/files
+tempencrypted/
 
 ### OSX ###
 .DS_Store
