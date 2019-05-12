@@ -1,14 +1,9 @@
 import requests
 import ast
-<<<<<<< HEAD
-import os.path
+import os
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import AES, PKCS1_OAEP
-=======
-import os
-from Crypto.Cipher import AES
 from Crypto.Util import Padding
->>>>>>> afc97f604f8b2657fd60fdef8a715ec1da385b9f
 from Crypto import Random
 
 
