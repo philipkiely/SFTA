@@ -24,6 +24,28 @@ import ast
 #TODO: MAC on responses
 #TODO: Encrypt files
 
+
+def decrypt_request_data(request_data):
+    # Read in Server's Private Key
+    file_in = open(settings.MEDIA_ROOT + "server_priv_key.pem", "r")
+    server_priv_key = RSA.import_key(file_in.read())
+    file_in.close()
+    # Decrypt Request data from Client
+    server_cipher = PKCS1_OAEP.new(server_priv_key)
+    return ast.literal_eval(str(server_cipher.decrypt(bytes(ast.literal_eval(request_data))))[2:-1])
+
+def encrypt_response_data(response_dict):
+    # Read in Client's Public Key
+    file_in = open(settings.MEDIA_ROOT + "client_pub_key.pem", "r")
+    client_key = RSA.import_key(file_in.read())
+    file_in.close()
+
+    # Encrypt Response for Client
+    response_dict = (str(response_dict)).encode("utf-8")
+    client_cipher = PKCS1_OAEP.new(client_key)
+    return str(list(client_cipher.encrypt(response_dict)))
+
+
 #path('/', views.api_index, name='api_index'),
 @ratelimit(key='ip', rate='1/s')
 @define_usage(returns={"url_usage": "Dict"})
@@ -45,15 +67,9 @@ def api_index(request):
 @api_view(["POST"])
 @permission_classes((AllowAny,))
 def api_signup(request):
-    ############################################################################################################## 
-    # Load Server's Private Key
-    file_in = open(settings.MEDIA_ROOT + "server_priv_key.pem", "r")
-    server_priv_key = RSA.import_key(file_in.read())
-    file_in.close()
-    # Decrypt Request data from Client
-    server_cipher = PKCS1_OAEP.new(server_priv_key)
-    decrypted_request_data = ast.literal_eval(str(server_cipher.decrypt(bytes(ast.literal_eval(request.data["data"]))))[2:-1])
-    ##############################################################################################################
+
+    decrypted_request_data = decrypt_request_data(request.data['data'])
+
     try:
         email = decrypted_request_data['email']
         username = decrypted_request_data['username']
@@ -73,17 +89,7 @@ def api_signup(request):
     else:
         response_dict = {'authenticated': False, 'token': None}
 
-    ##############################################################################################################
-    # Read in Client's Public Key
-    file_in = open(settings.MEDIA_ROOT + "client_pub_key.pem", "r")
-    client_key = RSA.import_key(file_in.read())
-    file_in.close()
-
-    # Encrypt Response for Client
-    response_dict = (str(response_dict)).encode("utf-8")
-    client_cipher = PKCS1_OAEP.new(client_key)
-    encrypted_response_dict = str(list(client_cipher.encrypt(response_dict)))
-    ##############################################################################################################
+    encrypted_response_dict = encrypt_response_data(response_dict)
 
     return Response({'response': encrypted_response_dict})
 
@@ -105,39 +111,7 @@ def api_signin(request):
 
     ##############################################################################################################    
     # Encrypting Signin request.data with RSA: dictionary -> string -> utf-8 encode  
-    # Generate RSA Key
-    key_signinreq = RSA.generate(2048)
 
-    # Private Key
-    priv_key_signinreq = key_signinreq.export_key()
-    # print("REACHED:   ", priv_key_signinreq)
-    file_out = open("/Users/nihalpai/Desktop/SFTA/private_signinreq.pem", "wb")
-    file_out.write(priv_key_signinreq)
-    file_out.close()
-
-    # Public Key
-    pub_key_signinreq = key_signinreq.publickey().export_key()
-    file_out = open("/Users/nihalpai/Desktop/SFTA/receiver_signinreq.pem", "wb")
-    file_out.write(pub_key_signinreq)
-    file_out.close()
-
-    # Encrypt Data
-    signin_request_data = str({'username': username, 'password': password}).encode("utf-8")
-    file_out = open("/Users/nihalpai/Desktop/SFTA/encrypted_signin_request_data.bin", "wb")
-
-    # Generate Recipient & Session Keys
-    recipient_key_signinreq = RSA.import_key(open("/Users/nihalpai/Desktop/SFTA/receiver_signinreq.pem").read())
-    session_key_signinreq = get_random_bytes(16)
-
-    # Encrypt session key with public RSA key
-    cipher_rsa_signinreq = PKCS1_OAEP.new(recipient_key_signinreq)
-    enc_session_key_signinreq = cipher_rsa_signinreq.encrypt(session_key_signinreq)
-
-    # Encrypt request data with AES session key
-    cipher_aes_signinreq = AES.new(session_key_signinreq, AES.MODE_EAX)
-    ciphertext_signinreq, tag_signinreq = cipher_aes_signinreq.encrypt_and_digest(signin_request_data)
-    [ file_out.write(x) for x in (enc_session_key_signinreq, cipher_aes_signinreq.nonce, tag_signinreq, ciphertext_signinreq) ]
-    file_out.close()
     ##############################################################################################################
 
     if user is not None:

@@ -6,6 +6,29 @@ from Crypto.Cipher import AES, PKCS1_OAEP
 from Crypto.Util import Padding
 from Crypto import Random
 
+def encrypt_request_data(request_data):
+    # Load Server's Public Key
+    file_in = open("server_pub_key.pem", "r")
+    server_key = RSA.import_key(file_in.read())
+    file_in.close()
+
+    # Encrypt Data with Server's Public Key
+    request_dict = (str(request_data)).encode("utf-8")
+    server_cipher = PKCS1_OAEP.new(server_key)
+    encrypted_request_dict = str(list(server_cipher.encrypt(request_dict)))
+    return {"data": encrypted_request_dict}
+
+
+def decrypt_response_data(response_data):
+    # Load Client's Private Key
+    file_in = open("client_priv_key.pem", "r")
+    client_priv_key = RSA.import_key(file_in.read())
+    file_in.close()
+
+    # Decrypt Response data from Server
+    client_cipher = PKCS1_OAEP.new(client_priv_key)
+    return ast.literal_eval(str(client_cipher.decrypt(bytes(ast.literal_eval(response_data))))[2:-1])
+
 
 def save_state():
     global state
@@ -50,35 +73,11 @@ def signup():
     email = input()
     data = {"username": username, "password": password, "email": email}
 
-    ##################################################################################################################
-    # Encrypt Request data to send to server
-
-    # Load Server's Public Key
-    file_in = open("server_pub_key.pem", "r")
-    server_key = RSA.import_key(file_in.read())
-    file_in.close()
-
-    # Encrypt Data with Server's Public Key
-    request_dict = (str(data)).encode("utf-8")
-    server_cipher = PKCS1_OAEP.new(server_key)
-    encrypted_request_dict = str(list(server_cipher.encrypt(request_dict)))
-    encrypted_request_data = {"data": encrypted_request_dict}
-    ##################################################################################################################
+    encrypted_request_data = encrypt_request_data(data)
 
     r = requests.post("http://localhost:8000/signup/", data=encrypted_request_data).json()
 
-    ##################################################################################################################
-    # Decrypt the Response from server
-
-    # Load Client's Private Key
-    file_in = open("client_priv_key.pem", "r")
-    client_priv_key = RSA.import_key(file_in.read())
-    file_in.close()
-
-    # Decrypt Response data from Server
-    client_cipher = PKCS1_OAEP.new(client_priv_key)
-    decrypted_r = ast.literal_eval(str(client_cipher.decrypt(bytes(ast.literal_eval(r["response"]))))[2:-1])
-    ##################################################################################################################
+    decrypted_r = decrypt_response_data(r['response'])
 
     if decrypted_r["authenticated"]:
         state["authenticated"] = True
