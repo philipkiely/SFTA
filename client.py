@@ -61,7 +61,8 @@ def signup():
     # Encrypt Data with Server's Public Key
     request_dict = (str(data)).encode("utf-8")
     server_cipher = PKCS1_OAEP.new(server_key)
-    encrypted_request_dict = str(server_cipher.encrypt(request_dict), 'utf-8', 'ignore')
+    encrypted_request_dict = str(list(server_cipher.encrypt(request_dict)))
+    print(encrypted_request_dict)
     encrypted_request_data = {"data": encrypted_request_dict}
     print("\nEncrypted Request Data CLIENT SIDE: ", encrypted_request_data)
     ##################################################################################################################
