@@ -52,11 +52,10 @@ def api_signup(request):
     file_in.close()
     # Decrypt Request data from Client
     server_cipher = PKCS1_OAEP.new(server_priv_key)
-    print("\nEncrypted Request Data SERVER SIDE: ", request.data)
-    print(len(request.data["data"]))
-    # print("\nDictionary value to decrypt i.e. request.data['data'] :", request.data['data'])
+    # print("\nEncrypted Request Data SERVER SIDE: ", request.data)
+    # print(len(request.data["data"]))
     decrypted_request_data = ast.literal_eval(str(server_cipher.decrypt(bytes(ast.literal_eval(request.data["data"]))))[2:-1])
-    print("\nDecrypted Request Data SERVER SIDE: ", decrypted_request_data) # should be {"email": ----, "username": ---, "password": ---} format
+    # print("\nDecrypted Request Data SERVER SIDE: ", decrypted_request_data) # should be {"email": ----, "username": ---, "password": ---} format
     ##############################################################################################################
     try:
         email = decrypted_request_data['email']
@@ -79,17 +78,17 @@ def api_signup(request):
 
     ##############################################################################################################
     # Read in Client's Public Key
-    file_in = open(settings.MEDIA_ROOT + "client_pub_key.pem", "wb")
+    file_in = open(settings.MEDIA_ROOT + "client_pub_key.pem", "r")
     client_key = RSA.import_key(file_in.read())
     file_in.close()
 
     # Encrypt Response for Client
+    response_dict = (str(response_dict)).encode("utf-8")
     client_cipher = PKCS1_OAEP.new(client_key)
-    encrypted_response_dict = client_cipher.encrypt(str(response_dict).encode("utf-8"))
-    print("\nEncrypted Response SERVER SIDE: ", encrypted_response_dict)
+    encrypted_response_dict = str(list(client_cipher.encrypt(response_dict)))
     ##############################################################################################################
 
-    return Response({'data': encrypted_response_dict})
+    return Response({'response': encrypted_response_dict})
 
 
 #path('signin/', views.api_signin, name='api_signin'),

@@ -77,9 +77,9 @@ def signup():
     client_priv_key = RSA.import_key(file_in.read())
     file_in.close()
 
+    # Decrypt Response data from Server
     client_cipher = PKCS1_OAEP.new(client_priv_key)
-    print("\nEncrypted Response CLIENT SIDE: ", r)
-    decrypted_r = client_cipher.decrypt(r)
+    decrypted_r = ast.literal_eval(str(client_cipher.decrypt(bytes(ast.literal_eval(r["response"]))))[2:-1])
     print("\nDecrypted Request Data CLIENT SIDE: ", decrypted_r) # Is this in proper format?
     ##################################################################################################################
 
