@@ -1,12 +1,16 @@
 import requests
 import ast
+import os
+from Crypto.Cipher import AES
+from Crypto.Util import Padding
+from Crypto import Random
 
 
 def save_state():
     global state
     with open("state.txt", "w") as f:
         f.write(str(state))
-    
+
 
 def load_state():
     try:
@@ -101,13 +105,31 @@ def upload():
     data = {"client_msn": state["client_msn"]}
     print("path to file you want to upload")
     path = input()
-    files = {'file': open(path, 'rb')}
+    ifile = open(path, 'rb')
+    plaintext = ifile.read()
+    ifile.close()
+    #MODIFIED FROM HW3 QUESTION 1 / HW3 QUESTION 1 SOLUTIONS
+    # apply PKCS7 padding on the plaintext
+    padded_plaintext = Padding.pad(plaintext, AES.block_size)
+    # generate random IV and create an AES-CBC cipher object
+    iv = Random.get_random_bytes(AES.block_size)
+    key = "SHAREDSECRET4444".encode('utf-8')
+    cipher_CBC = AES.new(key, AES.MODE_CBC, iv)
+    # also create an AES-ECB object for encrypting the IV
+    cipher_ECB = AES.new(key, AES.MODE_ECB)
+    # write out the encrypted IV and the padded and encrypted plaintext to the output file
+    ofile = open("tempencrypted/" + path, "wb+")
+    ofile.write(cipher_ECB.encrypt(iv))
+    ofile.write(cipher_CBC.encrypt(padded_plaintext))
+    ofile.close()
+    files = {'file': open("tempencrypted/" + path, 'rb')}
     headers = {"Authorization": state["token"]}
     r = requests.post("http://localhost:8000/upload/", headers=headers, data=data, files=files).json()
+    os.remove("tempencrypted/" + path)
     if not check_server_msn(int(r["server_msn"])):
         return
     print(r)
-    
+
 
 #path('download/', views.api_download, name='api_download'),
 def download():
@@ -122,9 +144,28 @@ def download():
     #    return
     print("Save As:")
     save_path = input()
-    with open(save_path, "wb") as f:
+    with open("tempencrypted/" + save_path, "wb+") as f:
         for chunk in r.iter_content(1024):
             f.write(chunk)
+    #MODIFIED FROM HW3 QUESTION 1 / HW3 QUESTION 1 SOLUTIONS
+    ifile = open("tempencrypted/" + save_path, 'rb')
+    encrypted_iv = ifile.read(AES.block_size)
+    ciphertext = ifile.read()
+    ifile.close()
+    # create 2 AES cipher objects, one for decrypting the IV and one for decrypting the payload
+    # and initialize these cipher objects with the appropriate parameters
+    key = "SHAREDSECRET4444".encode('utf-8')
+    cipher_ECB = AES.new(key, AES.MODE_ECB)
+    iv = cipher_ECB.decrypt(encrypted_iv)
+    cipher_CBC = AES.new(key, AES.MODE_CBC, iv)
+    # decrypt the ciphertext and remove padding
+    padded_plaintext = cipher_CBC.decrypt(ciphertext)
+    plaintext = Padding.unpad(padded_plaintext, AES.block_size)
+    # write out the plaintext into the output file
+    ofile = open(save_path, "wb+")
+    ofile.write(plaintext)
+    ofile.close()
+    os.remove("tempencrypted/" + save_path)
     return
 
 
@@ -197,4 +238,5 @@ def client():
 
 if __name__ == "__main__":
     state = load_state()
+    os.makedirs("tempencrypted", exist_ok=True)
     client()

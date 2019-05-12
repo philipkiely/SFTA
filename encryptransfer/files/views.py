@@ -8,14 +8,14 @@ from rest_framework.status import HTTP_400_BAD_REQUEST
 from ratelimit.decorators import ratelimit
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
+from django.http import HttpResponse
 from django.conf import settings
 from .decorators import define_usage
 from .models import File, AccessController, Profile
-import os
 import mimetypes
 
 
-#TODO: Rate Limit
+
 #TODO: MAC on responses
 #TODO: Encrypt files
 
@@ -151,7 +151,7 @@ def api_download(request):
     if f.owner == request.user:
         data = f.file.read() #in production this would instead be handled by Apache
         f.file.close()
-        response = Response(data, content_type=mimetypes.guess_type(settings.MEDIA_ROOT + f.file.name)[0])
+        response = HttpResponse(data, content_type=mimetypes.guess_type(settings.MEDIA_ROOT + f.file.name)[0])
         response['Content-Disposition'] = "attachment; filename={0}".format(f.file)
         response['Content-Length'] = f.file.size
         return response
