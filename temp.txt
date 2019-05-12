@@ -1,1 +1,0 @@
-{'authenticated': True, 'token': 'Token d05b8133585afaed76f44e23d81b13f0e6813471', 'client_msn': 25, 'server_msn': 28}

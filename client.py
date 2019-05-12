@@ -54,14 +54,14 @@ def signup():
     # Encrypt Request data to send to server
 
     # Load Server's Public Key
-    file_in = open("/Users/nihalpai/Desktop/SFTA/server_pub_key.pem", "r")
+    file_in = open("server_pub_key.pem", "r")
     server_key = RSA.import_key(file_in.read())
     file_in.close()
 
     # Encrypt Data with Server's Public Key
     request_dict = (str(data)).encode("utf-8")
     server_cipher = PKCS1_OAEP.new(server_key)
-    encrypted_request_dict = server_cipher.encrypt(request_dict)
+    encrypted_request_dict = str(server_cipher.encrypt(request_dict), 'utf-8', 'ignore')
     encrypted_request_data = {"data": encrypted_request_dict}
     print("\nEncrypted Request Data CLIENT SIDE: ", encrypted_request_data)
     ##################################################################################################################
@@ -72,13 +72,13 @@ def signup():
     # Decrypt the Response from server
 
     # Load Client's Private Key
-    file_in = open("/Users/nihalpai/Desktop/SFTA/client_priv_key.pem", "r")
+    file_in = open("client_priv_key.pem", "r")
     client_priv_key = RSA.import_key(file_in.read())
     file_in.close()
 
     client_cipher = PKCS1_OAEP.new(client_priv_key)
     print("\nEncrypted Response CLIENT SIDE: ", r)
-    decrypted_r = server_cipher.decrypt(r)
+    decrypted_r = client_cipher.decrypt(r)
     print("\nDecrypted Request Data CLIENT SIDE: ", decrypted_r) # Is this in proper format?
     ##################################################################################################################
 

@@ -10,7 +10,7 @@ Note: this project requires Python 3\. All uses of the terminal commands `python
 
 Before proceeding, create a Python virtual environment for this project and, in the "SFTA" directory, run `pip install -r requirements.txt`
 
-TODO: generate RSA keys using Nihal's thing
+To generate RSA keys, run `python key_gen.py`. This creates keypairs for the client and the server. We assume that the client can access the server's public key and that the server can access the client's public key, and we model that access locally by having them read from each others' public key files directly.
 
 ### Server
 

@@ -14,7 +14,6 @@ from .decorators import define_usage
 from .models import File, AccessController, Profile
 import mimetypes
 
-import os.path
 from Crypto.PublicKey import RSA
 from Crypto.Random import get_random_bytes
 from Crypto.Cipher import AES, PKCS1_OAEP
@@ -38,6 +37,7 @@ def api_index(request):
                 details[reverse(item[1].__name__)] = item[1].usage
     return Response(details)
 
+
 #path('signup/', views.api_signup, name='api_signup'),
 @ratelimit(key='ip', rate='1/s')
 @define_usage(params={"email": "String", "username": "String", "password": "String"},
@@ -45,21 +45,19 @@ def api_index(request):
 @api_view(["POST"])
 @permission_classes((AllowAny,))
 def api_signup(request):
-
     ############################################################################################################## 
     # Load Server's Private Key
-    file_in = open("/Users/nihalpai/Desktop/SFTA/server_priv_key.pem", "r")
+    file_in = open(settings.MEDIA_ROOT + "server_priv_key.pem", "r")
     server_priv_key = RSA.import_key(file_in.read())
     file_in.close()
- 
     # Decrypt Request data from Client
     server_cipher = PKCS1_OAEP.new(server_priv_key)
     print("\nEncrypted Request Data SERVER SIDE: ", request.data)
+    print(bytes(request.data["data"], 'utf-8', 'ignore'))
     # print("\nDictionary value to decrypt i.e. request.data['data'] :", request.data['data'])
-    decrypted_request_data = ast.literal_eval(server_cipher.decrypt(request.data['data']))
+    decrypted_request_data = ast.literal_eval(server_cipher.decrypt(bytes(request.data["data"], 'utf-8', 'ignore')))
     print("\nDecrypted Request Data SERVER SIDE: ", decrypted_request_data) # should be {"email": ----, "username": ---, "password": ---} format
     ##############################################################################################################
-
     try:
         email = decrypted_request_data['email']
         username = decrypted_request_data['username']
@@ -81,17 +79,17 @@ def api_signup(request):
 
     ##############################################################################################################
     # Read in Client's Public Key
-    file_in = open("/Users/nihalpai/Desktop/SFTA/client_pub_key.pem", "wb")
+    file_in = open(settings.MEDIA_ROOT + "client_pub_key.pem", "wb")
     client_key = RSA.import_key(file_in.read())
     file_in.close()
 
     # Encrypt Response for Client
-    client_cipher =  PKCS1_OAEP.new(client_key)
-    encrypted_response_dict = server_cipher.encrypt(str(response_dict).encode("utf-8"))
+    client_cipher = PKCS1_OAEP.new(client_key)
+    encrypted_response_dict = client_cipher.encrypt(str(response_dict).encode("utf-8"))
     print("\nEncrypted Response SERVER SIDE: ", encrypted_response_dict)
     ##############################################################################################################
 
-    return Response(encrypted_response_dict)
+    return Response({'data': encrypted_response_dict})
 
 
 #path('signin/', views.api_signin, name='api_signin'),
