@@ -11,9 +11,11 @@ from django.contrib.auth.models import User
 from .decorators import define_usage
 from .models import File, AccessController, Profile
 
-from Crypto.Cipher import PKCS1_v1_5
+import os.path
 from Crypto.PublicKey import RSA
-from Crypto.Hash import SHA256256
+from Crypto.Random import get_random_bytes
+from Crypto.Cipher import AES, PKCS1_OAEP
+import ast
 
 
 #path('/', views.api_index, name='api_index'),
@@ -28,28 +30,34 @@ def api_index(request):
                 details[reverse(item[1].__name__)] = item[1].usage
     return Response(details)
 
-
-# Encrypt request.data and Response
-
 #path('signup/', views.api_signup, name='api_signup'),
 @define_usage(params={"email": "String", "username": "String", "password": "String"},
               returns={'authenticated': 'Bool', 'token': 'Token String'})
 @api_view(["POST"])
 @permission_classes((AllowAny,))
 def api_signup(request):
+
+    ############################################################################################################## 
+    # Load Server's Private Key
+    file_in = open("/Users/nihalpai/Desktop/SFTA/server_priv_key.pem", "r")
+    server_priv_key = RSA.import_key(file_in.read())
+    file_in.close()
+ 
+    # Decrypt Request data from Client
+    server_cipher = PKCS1_OAEP.new(server_priv_key)
+    print("\nEncrypted Request Data SERVER SIDE: ", request.data)
+    # print("\nDictionary value to decrypt i.e. request.data['data'] :", request.data['data'])
+    decrypted_request_data = ast.literal_eval(server_cipher.decrypt(request.data['data']))
+    print("\nDecrypted Request Data SERVER SIDE: ", decrypted_request_data) # should be {"email": ----, "username": ---, "password": ---} format
+    ##############################################################################################################
+
     try:
-        email = request.data['email']
-        username = request.data['username']
-        password = request.data['password']
+        email = decrypted_request_data['email']
+        username = decrypted_request_data['username']
+        password = decrypted_request_data['password']
     except:
         return Response({'error': 'Please provide correct email, username, and password'},
                         status=HTTP_400_BAD_REQUEST)
-
-    # encrypting request.data with RSA
-    h_request = SHA256.new(request.data)
-    enc_key_request = RSA.importKey('pubkey')
-    cipher_request = PKCS1_v1_5.new(enc_key_request)
-    enc_request_RSA = cipher_request.encrypt(request.data+h_request.digest())
 
     user = User.objects.create_user(username, email, password)
     user.save()
@@ -58,25 +66,23 @@ def api_signup(request):
     user_profile.save()
     if user is not None:
         token, _ = Token.objects.get_or_create(user=user)
-
-        # encrypting true response
-        true_response_dict = {'authenticated': True, 'token': "Token " + token.key}
-        true_response_h = SHA256.new(true_response_dict)
-        true_response_enc_key = RSA.importKey('pubkey2')
-        true_response_cipher = PKCS1_v1_5.new(true_response_enc_key)
-        true_response_enc_RSA = true_response_cipher.encrypt(true_response_dict + true_response_h.digest())
-
-        return Response({'authenticated': True, 'token': "Token " + token.key})
+        response_dict = {'authenticated': True, 'token': "Token " + token.key}
     else:
+        response_dict = {'authenticated': False, 'token': None}
 
-        # encrypting false response
-        false_response_dict = {'authenticated': False, 'token': None}
-        false_response_h = SHA256.new(false_response_dict)
-        false_response_enc_key = RSA.importKey('pubkey3')
-        false_response_cipher = PKCS1_v1_5.new(false_response_enc_key)
-        false_response_enc_RSA = false_response_cipher.encrypt(false_response_dict + false_response_h.digest())
+    ##############################################################################################################
+    # Read in Client's Public Key
+    file_in = open("/Users/nihalpai/Desktop/SFTA/client_pub_key.pem", "wb")
+    client_key = RSA.import_key(file_in.read())
+    file_in.close()
 
-        return Response({'authenticated': False, 'token': None})
+    # Encrypt Response for Client
+    client_cipher =  PKCS1_OAEP.new(client_key)
+    encrypted_response_dict = server_cipher.encrypt(str(response_dict).encode("utf-8"))
+    print("\nEncrypted Response SERVER SIDE: ", encrypted_response_dict)
+    ##############################################################################################################
+
+    return Response(encrypted_response_dict)
 
 
 #path('signin/', views.api_signin, name='api_signin'),
@@ -93,31 +99,89 @@ def api_signin(request):
                         status=HTTP_400_BAD_REQUEST)
     user = authenticate(username=username, password=password)
 
-    # encrypting request.data with RSA
-    h_request = SHA256.new(request.data)
-    enc_key_request = RSA.importKey('pubkey4')
-    cipher_request = PKCS1_v1_5.new(enc_key_request)
-    enc_request_RSA = cipher_request.encrypt(request.data+h_request.digest())
+    ##############################################################################################################    
+    # Encrypting Signin request.data with RSA: dictionary -> string -> utf-8 encode  
+    # Generate RSA Key
+    key_signinreq = RSA.generate(2048)
+
+    # Private Key
+    priv_key_signinreq = key_signinreq.export_key()
+    # print("REACHED:   ", priv_key_signinreq)
+    file_out = open("/Users/nihalpai/Desktop/SFTA/private_signinreq.pem", "wb")
+    file_out.write(priv_key_signinreq)
+    file_out.close()
+
+    # Public Key
+    pub_key_signinreq = key_signinreq.publickey().export_key()
+    file_out = open("/Users/nihalpai/Desktop/SFTA/receiver_signinreq.pem", "wb")
+    file_out.write(pub_key_signinreq)
+    file_out.close()
+
+    # Encrypt Data
+    signin_request_data = str({'username': username, 'password': password}).encode("utf-8")
+    file_out = open("/Users/nihalpai/Desktop/SFTA/encrypted_signin_request_data.bin", "wb")
+
+    # Generate Recipient & Session Keys
+    recipient_key_signinreq = RSA.import_key(open("/Users/nihalpai/Desktop/SFTA/receiver_signinreq.pem").read())
+    session_key_signinreq = get_random_bytes(16)
+
+    # Encrypt session key with public RSA key
+    cipher_rsa_signinreq = PKCS1_OAEP.new(recipient_key_signinreq)
+    enc_session_key_signinreq = cipher_rsa_signinreq.encrypt(session_key_signinreq)
+
+    # Encrypt request data with AES session key
+    cipher_aes_signinreq = AES.new(session_key_signinreq, AES.MODE_EAX)
+    ciphertext_signinreq, tag_signinreq = cipher_aes_signinreq.encrypt_and_digest(signin_request_data)
+    [ file_out.write(x) for x in (enc_session_key_signinreq, cipher_aes_signinreq.nonce, tag_signinreq, ciphertext_signinreq) ]
+    file_out.close()
+    ##############################################################################################################
 
     if user is not None:
         token, _ = Token.objects.get_or_create(user=user)
-
-        # encrypting true response
-        true_response_dict = {'authenticated': True, 'token': "Token " + token.key}
-        true_response_h = SHA256.new(true_response_dict)
-        true_response_enc_key = RSA.importKey('pubkey5')
-        true_response_cipher = PKCS1_v1_5.new(true_response_enc_key)
-        true_response_enc_RSA = true_response_cipher.encrypt(true_response_dict + true_response_h.digest())
-
-        return Response({'authenticated': True, 'token': "Token " + token.key})
+        response = Response({'authenticated': True, 'token': "Token " + token.key})
     else:
-        false_response_dict = {'authenticated': False, 'token': None}
-        false_response_h = SHA256.new(false_response_dict)
-        false_response_enc_key = RSA.importKey('pubkey6')
-        false_response_cipher = PKCS1_v1_5.new(false_response_enc_key)
-        false_response_enc_RSA = false_response_cipher.encrypt(false_response_dict + false_response_h.digest())
+        response = Response({'authenticated': False, 'token': None})
 
-        return Response({'authenticated': False, 'token': None})
+    ##############################################################################################################    
+    # Encrypting Signin Response with RSA
+
+    # Generate RSA Key
+    key_signinresp = RSA.generate(2048)
+
+    # Private Key
+    priv_key_signinresp = key_signinresp.export_key()
+    file_out = open("/Users/nihalpai/Desktop/SFTA/private_signinresp.pem", "wb")
+    file_out.write(priv_key_signinresp)
+    file_out.close()
+
+    # Public Key
+    pub_key_signinresp = key_signinresp.publickey().export_key()
+    file_out = open("/Users/nihalpai/Desktop/SFTA/receiver_signinresp.pem", "wb")
+    file_out.write(pub_key_signinresp)
+    file_out.close()
+
+    # Encrypt Data
+    signinresp_data = str({'authenticated': True, 'token': "Token " + token.key}).encode("utf-8")
+    file_out = open("/Users/nihalpai/Desktop/SFTA/encrypted_signin_response_data.bin", "wb")
+
+    # Generate Recipient & Session Keys
+    recipient_key_signinresp = RSA.import_key(open("/Users/nihalpai/Desktop/SFTA/receiver_signinresp.pem").read())
+    session_key_signinresp = get_random_bytes(16)
+
+    # Encrypt session key with public RSA key
+    cipher_rsa_signinresp = PKCS1_OAEP.new(recipient_key_signinresp)
+    enc_session_key_signinnresp = cipher_rsa_signinresp.encrypt(session_key_signinresp)
+
+    # Encrypt true response data with AES session key
+    cipher_aes_signinresp = AES.new(session_key_signinresp, AES.MODE_EAX)
+    ciphertext_signinresp, tag_signinresp = cipher_aes_signinresp.encrypt_and_digest(signinresp_data)
+    [ file_out.write(x) for x in (enc_session_key_signinresp, cipher_aes_signinresp.nonce, tag_signinresp, ciphertext_signinresp) ]
+    file_out.close()
+    ##############################################################################################################
+
+    return response
+
+
 
 
 #checking client msn

@@ -1,5 +1,10 @@
 # Created by https://www.gitignore.io
 
+client_priv_key.pem
+client_pub_key.pem
+server_priv_key.pem
+server_pub_key.pem
+
 state.txt
 media/
 media/files

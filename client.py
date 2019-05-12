@@ -1,5 +1,9 @@
 import requests
 import ast
+import os.path
+from Crypto.PublicKey import RSA
+from Crypto.Cipher import AES, PKCS1_OAEP
+from Crypto import Random
 
 
 def save_state():
@@ -45,11 +49,42 @@ def signup():
     print("Enter an email")
     email = input()
     data = {"username": username, "password": password, "email": email}
-    r = requests.post("http://localhost:8000/signup/", data=data).json()
-    if r["authenticated"]:
-        print("here here")
+
+    ##################################################################################################################
+    # Encrypt Request data to send to server
+
+    # Load Server's Public Key
+    file_in = open("/Users/nihalpai/Desktop/SFTA/server_pub_key.pem", "r")
+    server_key = RSA.import_key(file_in.read())
+    file_in.close()
+
+    # Encrypt Data with Server's Public Key
+    request_dict = (str(data)).encode("utf-8")
+    server_cipher = PKCS1_OAEP.new(server_key)
+    encrypted_request_dict = server_cipher.encrypt(request_dict)
+    encrypted_request_data = {"data": encrypted_request_dict}
+    print("\nEncrypted Request Data CLIENT SIDE: ", encrypted_request_data)
+    ##################################################################################################################
+
+    r = requests.post("http://localhost:8000/signup/", data=encrypted_request_data).json()
+
+    ##################################################################################################################
+    # Decrypt the Response from server
+
+    # Load Client's Private Key
+    file_in = open("/Users/nihalpai/Desktop/SFTA/client_priv_key.pem", "r")
+    client_priv_key = RSA.import_key(file_in.read())
+    file_in.close()
+
+    client_cipher = PKCS1_OAEP.new(client_priv_key)
+    print("\nEncrypted Response CLIENT SIDE: ", r)
+    decrypted_r = server_cipher.decrypt(r)
+    print("\nDecrypted Request Data CLIENT SIDE: ", decrypted_r) # Is this in proper format?
+    ##################################################################################################################
+
+    if decrypted_r["authenticated"]:
         state["authenticated"] = True
-        state["token"] = r["token"]
+        state["token"] = decrypted_r["token"]
     print(state)
     return
 
@@ -62,6 +97,7 @@ def signin():
     print("Enter your password")
     password = input()
     data = {"username": username, "password": password}
+
     r = requests.post("http://localhost:8000/signin/", data=data).json()
     if r["authenticated"]:
         state["authenticated"] = True
@@ -70,6 +106,8 @@ def signin():
         print("Invalid Credentials")
         signin()
     return
+
+
 
 
 #path('my_files/', views.api_my_files, name='api_my_files'),
