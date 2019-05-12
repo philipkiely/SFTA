@@ -101,64 +101,26 @@ def api_signup(request):
 @api_view(["POST"])
 @permission_classes((AllowAny,))
 def api_signin(request):
+
+    decrypted_request_data = decrypt_request_data(request.data['data'])
+
     try:
-        username = request.data['username']
-        password = request.data['password']
+        username = decrypted_request_data['username']
+        password = decrypted_request_data['password']
     except:
         return Response({'error': 'Please provide correct username and password'},
                         status=HTTP_400_BAD_REQUEST)
     user = authenticate(username=username, password=password)
 
-    ##############################################################################################################    
-    # Encrypting Signin request.data with RSA: dictionary -> string -> utf-8 encode  
-
-    ##############################################################################################################
-
     if user is not None:
         token, _ = Token.objects.get_or_create(user=user)
-        response = Response({'authenticated': True, 'token': "Token " + token.key})
+        response_dict = {'authenticated': True, 'token': "Token " + token.key}
     else:
-        response = Response({'authenticated': False, 'token': None})
+        response_dict = {'authenticated': False, 'token': None}
 
-    ##############################################################################################################    
-    # Encrypting Signin Response with RSA
+    encrypted_response_dict = encrypt_response_data(response_dict)
 
-    # Generate RSA Key
-    key_signinresp = RSA.generate(2048)
-
-    # Private Key
-    priv_key_signinresp = key_signinresp.export_key()
-    file_out = open("/Users/nihalpai/Desktop/SFTA/private_signinresp.pem", "wb")
-    file_out.write(priv_key_signinresp)
-    file_out.close()
-
-    # Public Key
-    pub_key_signinresp = key_signinresp.publickey().export_key()
-    file_out = open("/Users/nihalpai/Desktop/SFTA/receiver_signinresp.pem", "wb")
-    file_out.write(pub_key_signinresp)
-    file_out.close()
-
-    # Encrypt Data
-    signinresp_data = str({'authenticated': True, 'token': "Token " + token.key}).encode("utf-8")
-    file_out = open("/Users/nihalpai/Desktop/SFTA/encrypted_signin_response_data.bin", "wb")
-
-    # Generate Recipient & Session Keys
-    recipient_key_signinresp = RSA.import_key(open("/Users/nihalpai/Desktop/SFTA/receiver_signinresp.pem").read())
-    session_key_signinresp = get_random_bytes(16)
-
-    # Encrypt session key with public RSA key
-    cipher_rsa_signinresp = PKCS1_OAEP.new(recipient_key_signinresp)
-    enc_session_key_signinnresp = cipher_rsa_signinresp.encrypt(session_key_signinresp)
-
-    # Encrypt true response data with AES session key
-    cipher_aes_signinresp = AES.new(session_key_signinresp, AES.MODE_EAX)
-    ciphertext_signinresp, tag_signinresp = cipher_aes_signinresp.encrypt_and_digest(signinresp_data)
-    [ file_out.write(x) for x in (enc_session_key_signinresp, cipher_aes_signinresp.nonce, tag_signinresp, ciphertext_signinresp) ]
-    file_out.close()
-    ##############################################################################################################
-
-    return response
-
+    return Response({'response': encrypted_response_dict})
 
 
 

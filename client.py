@@ -95,16 +95,19 @@ def signin():
     password = input()
     data = {"username": username, "password": password}
 
-    r = requests.post("http://localhost:8000/signin/", data=data).json()
-    if r["authenticated"]:
+    encrypted_request_data = encrypt_request_data(data)
+
+    r = requests.post("http://localhost:8000/signin/", data=encrypted_request_data).json()
+
+    decrypted_r = decrypt_response_data(r['response'])
+
+    if decrypted_r["authenticated"]:
         state["authenticated"] = True
-        state["token"] = r["token"]
+        state["token"] = decrypted_r["token"]
     else:
         print("Invalid Credentials")
         signin()
     return
-
-
 
 
 #path('my_files/', views.api_my_files, name='api_my_files'),
