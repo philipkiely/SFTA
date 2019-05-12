@@ -52,10 +52,7 @@ def api_signup(request):
     file_in.close()
     # Decrypt Request data from Client
     server_cipher = PKCS1_OAEP.new(server_priv_key)
-    # print("\nEncrypted Request Data SERVER SIDE: ", request.data)
-    # print(len(request.data["data"]))
     decrypted_request_data = ast.literal_eval(str(server_cipher.decrypt(bytes(ast.literal_eval(request.data["data"]))))[2:-1])
-    # print("\nDecrypted Request Data SERVER SIDE: ", decrypted_request_data) # should be {"email": ----, "username": ---, "password": ---} format
     ##############################################################################################################
     try:
         email = decrypted_request_data['email']

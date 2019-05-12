@@ -62,9 +62,7 @@ def signup():
     request_dict = (str(data)).encode("utf-8")
     server_cipher = PKCS1_OAEP.new(server_key)
     encrypted_request_dict = str(list(server_cipher.encrypt(request_dict)))
-    print(encrypted_request_dict)
     encrypted_request_data = {"data": encrypted_request_dict}
-    print("\nEncrypted Request Data CLIENT SIDE: ", encrypted_request_data)
     ##################################################################################################################
 
     r = requests.post("http://localhost:8000/signup/", data=encrypted_request_data).json()
@@ -80,7 +78,6 @@ def signup():
     # Decrypt Response data from Server
     client_cipher = PKCS1_OAEP.new(client_priv_key)
     decrypted_r = ast.literal_eval(str(client_cipher.decrypt(bytes(ast.literal_eval(r["response"]))))[2:-1])
-    print("\nDecrypted Request Data CLIENT SIDE: ", decrypted_r) # Is this in proper format?
     ##################################################################################################################
 
     if decrypted_r["authenticated"]:
