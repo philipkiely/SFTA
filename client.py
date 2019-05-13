@@ -166,7 +166,7 @@ def upload(): #####
     padded_plaintext = Padding.pad(plaintext, AES.block_size)
     # generate random IV and create an AES-CBC cipher object
     iv = Random.get_random_bytes(AES.block_size)
-    key = "SHAREDSECRET4444".encode('utf-8')
+    key = "SHAREDSECRET4444".encode('utf-8') #As the client, you can set your own AES Key, treat it like a password
     cipher_CBC = AES.new(key, AES.MODE_CBC, iv)
     # also create an AES-ECB object for encrypting the IV
     cipher_ECB = AES.new(key, AES.MODE_ECB)
@@ -212,7 +212,7 @@ def download():
     ifile.close()
     # create 2 AES cipher objects, one for decrypting the IV and one for decrypting the payload
     # and initialize these cipher objects with the appropriate parameters
-    key = "SHAREDSECRET4444".encode('utf-8')
+    key = "SHAREDSECRET4444".encode('utf-8') #As the client, you can set your own AES Key, treat it like a password
     cipher_ECB = AES.new(key, AES.MODE_ECB)
     iv = cipher_ECB.decrypt(encrypted_iv)
     cipher_CBC = AES.new(key, AES.MODE_CBC, iv)
@@ -239,7 +239,7 @@ def share(): ####
     data = {"client_msn": state["client_msn"], "fileID": fileID, "email": email}
     encrypted_headers = encrypt_request_data(headers)
     encrypted_data = encrypt_request_data(data)
-
+    
     r = requests.post("http://localhost:8000/share/", headers=encrypted_headers, data=encrypted_data).json()
 
     decrypted_r = decrypt_response_data(r['response'])
