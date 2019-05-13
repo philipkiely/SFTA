@@ -76,9 +76,7 @@ def signup():
     username = input()
     print("Enter a password")
     password = input()
-    print("Enter an email")
-    email = input()
-    data = {"username": username, "password": password, "email": email}
+    data = {"username": username, "password": password}
     state["username"] = username
     save_state()
     # generate new keys here for testing multiple clients on one machine.
@@ -251,8 +249,8 @@ def share(): ####
     headers = {"Authorization": state["token"]}
     print("FileID that you want to share")
     fileID = int(input())
-    print("Email of user to share with")
-    email = input()
+    print("Username of user to share with")
+    username = input()
     encrypted_headers = encrypt_request_data(headers)
     print("This may take a moment. Downloading file to encrypt...")
     data = {"client_msn": state["client_msn"], "fileID": fileID}
@@ -261,7 +259,7 @@ def share(): ####
     with open("tempencrypted/temp.file", "wb+") as f:
         for chunk in r.iter_content(1024):
             f.write(chunk)
-    print("Encrypting file again for {}".format(email))
+    print("Encrypting file again for {}".format(username))
     #MODIFIED FROM HW3 QUESTION 1 / HW3 QUESTION 1 SOLUTIONS
     ifile = open("tempencrypted/temp.file", 'rb')
     encrypted_iv = ifile.read(AES.block_size)
@@ -290,7 +288,7 @@ def share(): ####
     ofile.close()
     files = {'file': open("tempencrypted/temp.file", 'rb')}
     state["client_msn"] = state["client_msn"] + 1
-    data = {"client_msn": state["client_msn"], "fileID": fileID, "email": email, "key": sendable_key}
+    data = {"client_msn": state["client_msn"], "fileID": fileID, "username": username, "key": sendable_key}
     encrypted_data = encrypt_request_data(data)
     print("uploading file to share")
     r = requests.post("http://localhost:8000/share/", headers=encrypted_headers, data=encrypted_data, files=files).json()
@@ -309,9 +307,9 @@ def revoke(): #####
     headers = {"Authorization": state["token"]}
     print("FileID that you want to revoke")
     fileID = int(input())
-    print("Email of user to revoke from")
-    email = input()
-    data = {"client_msn": state["client_msn"], "fileID": fileID, "email": email}
+    print("Username of user to revoke from")
+    username = input()
+    data = {"client_msn": state["client_msn"], "fileID": fileID, "username": username}
     encrypted_headers = encrypt_request_data(headers)
     encrypted_data = encrypt_request_data(data)
 

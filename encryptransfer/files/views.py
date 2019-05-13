@@ -56,7 +56,7 @@ def api_index(request):
 
 #path('signup/', views.api_signup, name='api_signup'),
 @ratelimit(key='ip', rate='1/s')
-@define_usage(params={"email": "String", "username": "String", "password": "String"},
+@define_usage(params={"username": "String", "password": "String"},
               returns={'authenticated': 'Bool', 'token': 'Token String'})
 @api_view(["POST"])
 @permission_classes((AllowAny,))
@@ -65,9 +65,9 @@ def api_signup(request):
     decrypted_request_data = decrypt_request_data(request.data['data'])
 
     try:
-        email = decrypted_request_data['email']
         username = decrypted_request_data['username']
         password = decrypted_request_data['password']
+        email = username + "@fakemail.com" #basically Django requires email but we're ignoring it
     except:
         return Response({'error': 'Please provide correct email, username, and password'},
                         status=HTTP_400_BAD_REQUEST)
@@ -233,7 +233,7 @@ def api_share(request):
         return protected_response(user, {'error': 'error'})
     f = File.objects.get(id=decrypted_request_data['fileID'])
     if f.owner == user:
-        ac = AccessController(user=User.objects.get(email=decrypted_request_data["email"]), original=f, file=request.FILES.get('file'), key=decrypted_request_data["key"])
+        ac = AccessController(user=User.objects.get(username=decrypted_request_data["username"]), original=f, file=request.FILES.get('file'), key=decrypted_request_data["key"])
         ac.save()
     return protected_response(user, {'success': 'True'})
 
@@ -251,7 +251,7 @@ def api_revoke(request):
         return protected_response(user, {'error': 'error'})
     f = File.objects.get(id=decrypted_request_data['fileID'])
     if f.owner == user:
-        ac = AccessController.objects.get(user=User.objects.get(email=decrypted_request_data["email"]), original=f)
+        ac = AccessController.objects.get(user=User.objects.get(username=decrypted_request_data["username"]), original=f)
         ac.file.delete()
         ac.delete()
     return protected_response(user, {'success': 'True'})
