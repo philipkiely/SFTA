@@ -1,6 +1,7 @@
 import requests
 import ast
 import os
+import sys
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import AES, PKCS1_OAEP
 from Crypto.Util import Padding
@@ -22,7 +23,7 @@ def encrypt_request_data(request_data):
 
 def decrypt_response_data(response_data):
     # Load Client's Private Key
-    file_in = open("client_priv_key.pem", "r")
+    file_in = open("client_priv_key_{}.pem".format(state["username"]), "r")
     client_priv_key = RSA.import_key(file_in.read())
     file_in.close()
 
@@ -33,13 +34,16 @@ def decrypt_response_data(response_data):
 
 def save_state():
     global state
-    with open("state.txt", "w") as f:
-        f.write(str(state))
-
-
-def load_state():
     try:
-        with open("state.txt", "r") as f:
+        with open("state_{}.txt".format(state["username"]), "w") as f:
+            f.write(str(state))
+    except:
+        pass
+
+
+def load_state(username):
+    try:
+        with open("state_{}.txt".format(username), "r") as f:
             return ast.literal_eval(f.read()) # state
     except:
         return {"authenticated": False, "token": "", "client_msn": 0, "server_msn": 0} # initial state
@@ -73,7 +77,18 @@ def signup():
     print("Enter an email")
     email = input()
     data = {"username": username, "password": password, "email": email}
-
+    state["username"] = username
+    save_state()
+    # generate new keys here for testing multiple clients on one machine.
+    client_keys = RSA.generate(2048)
+    file_out = open("client_pub_key_{}.pem".format(username), "wb")
+    file_out.write(client_keys.publickey().export_key())
+    file_out.close()
+    file_out = open("client_priv_key_{}.pem".format(username), "wb")
+    file_out.write(client_keys.export_key())
+    file_out.close()
+    os.system("cp client_pub_key_{}.pem encryptransfer/media/".format(username)) #simulates that the server would have the client's public key
+    #new keys are made
     encrypted_request_data = encrypt_request_data(data)
 
     r = requests.post("http://localhost:8000/signup/", data=encrypted_request_data).json()
@@ -83,7 +98,6 @@ def signup():
     if decrypted_r["authenticated"]:
         state["authenticated"] = True
         state["token"] = decrypted_r["token"]
-    print(state)
     return
 
 
@@ -239,7 +253,7 @@ def share(): ####
     data = {"client_msn": state["client_msn"], "fileID": fileID, "email": email}
     encrypted_headers = encrypt_request_data(headers)
     encrypted_data = encrypt_request_data(data)
-    
+
     r = requests.post("http://localhost:8000/share/", headers=encrypted_headers, data=encrypted_data).json()
 
     decrypted_r = decrypt_response_data(r['response'])
@@ -307,6 +321,10 @@ def client():
 
 
 if __name__ == "__main__":
-    state = load_state()
+    try:
+        username = sys.argv[1]
+    except:
+        username = None
+    state = load_state(username)
     os.makedirs("tempencrypted", exist_ok=True)
     client()

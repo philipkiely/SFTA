@@ -28,9 +28,9 @@ def decrypt_request_data(request_data):
     return ast.literal_eval(str(server_cipher.decrypt(bytes(ast.literal_eval(request_data))))[2:-1])
 
 
-def encrypt_response_data(response_dict):
+def encrypt_response_data(response_dict, username):
     # Read in Client's Public Key
-    file_in = open(settings.MEDIA_ROOT + "client_pub_key.pem", "r")
+    file_in = open(settings.MEDIA_ROOT + "client_pub_key_{}.pem".format(username), "r")
     client_key = RSA.import_key(file_in.read())
     file_in.close()
 
@@ -83,7 +83,7 @@ def api_signup(request):
     else:
         response_dict = {'authenticated': False, 'token': None}
 
-    encrypted_response_dict = encrypt_response_data(response_dict)
+    encrypted_response_dict = encrypt_response_data(response_dict, user.username)
 
     return Response({'response': encrypted_response_dict})
 
@@ -112,7 +112,7 @@ def api_signin(request):
     else:
         response_dict = {'authenticated': False, 'token': None}
 
-    encrypted_response_dict = encrypt_response_data(response_dict)
+    encrypted_response_dict = encrypt_response_data(response_dict, user.username)
 
     return Response({'response': encrypted_response_dict})
 
@@ -134,7 +134,7 @@ def protected_response(user, data):
     user.profile.save()
     # Encrypt data
     # return Response(data)
-    return Response({'response': encrypt_response_data(data)})
+    return Response({'response': encrypt_response_data(data, user.username)})
 
 
 def custom_auth(data):

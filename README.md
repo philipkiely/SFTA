@@ -46,9 +46,9 @@ To view the available endpoints, go to `http://127.0.0.1:8000`. If you want to s
 
 ### Client
 
-The hard part is over. In a new terminal window, navigate to "SFTA" and run `python client.py`. Follow the instructions in the terminal to send requests. You can examine the state at any time by opening `state.txt` in any text editor.
+The hard part is over. In a new terminal window, navigate to "SFTA" and run `python client.py`. Follow the instructions in the terminal to send requests. You can examine the state at any time by opening `state_{username}.txt` in any text editor. Upon signup, the client will create and share the public part (out of band) of its keys to simulate the fact that on a real network, the user would be a different computer with different keys.
 
-You'll want to start by signing up and uploading then downloading a file. TODO: better multi-client support
+You'll want to start by signing up and uploading then downloading a file. Remember that you can pass username as a command line argument `python client.py username` to load a particular user's state.
 
 ### Note for production
 
