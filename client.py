@@ -213,7 +213,8 @@ def download():
     data = {"client_msn": state["client_msn"], "fileID": fileID}
     headers = {"Authorization": state["token"]}
     encrypted_headers = encrypt_request_data(headers)
-    r = requests.post("http://localhost:8000/download/", headers=encrypted_headers, data=data, stream=True)
+    encrypted_data = encrypt_request_data(data)
+    r = requests.post("http://localhost:8000/download/", headers=encrypted_headers, data=encrypted_data, stream=True)
     #if not check_server_msn(int(r["server_msn"])):
     #    return
     print("Save As:")
@@ -252,13 +253,48 @@ def share(): ####
     fileID = int(input())
     print("Email of user to share with")
     email = input()
-    data = {"client_msn": state["client_msn"], "fileID": fileID, "email": email}
     encrypted_headers = encrypt_request_data(headers)
+    print("This may take a moment. Downloading file to encrypt...")
+    data = {"client_msn": state["client_msn"], "fileID": fileID}
     encrypted_data = encrypt_request_data(data)
-    print("This may take a moment. Processing...")
-    
-    r = requests.post("http://localhost:8000/share/", headers=encrypted_headers, data=encrypted_data).json()
-
+    r = requests.post("http://localhost:8000/download/", headers=encrypted_headers, data=encrypted_data, stream=True)
+    with open("tempencrypted/temp.file", "wb+") as f:
+        for chunk in r.iter_content(1024):
+            f.write(chunk)
+    print("Encrypting file again for {}".format(email))
+    #MODIFIED FROM HW3 QUESTION 1 / HW3 QUESTION 1 SOLUTIONS
+    ifile = open("tempencrypted/temp.file", 'rb')
+    encrypted_iv = ifile.read(AES.block_size)
+    ciphertext = ifile.read()
+    ifile.close()
+    os.remove("tempencrypted/temp.file")
+    # create 2 AES cipher objects, one for decrypting the IV and one for decrypting the payload
+    # and initialize these cipher objects with the appropriate parameters
+    key = state["aes_key"].encode('utf-8') #As the client, you can set your own AES Key, treat it like a password
+    cipher_ECB = AES.new(key, AES.MODE_ECB)
+    iv = cipher_ECB.decrypt(encrypted_iv)
+    cipher_CBC = AES.new(key, AES.MODE_CBC, iv)
+    # decrypt the ciphertext and remove padding
+    padded_plaintext = cipher_CBC.decrypt(ciphertext)
+    # generate random IV and create an AES-CBC cipher object
+    iv = Random.get_random_bytes(AES.block_size)
+    sendable_key = ''.join(random.SystemRandom().choice('abcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*(-_=+)') for i in range(16))
+    key = sendable_key.encode('utf-8')
+    cipher_CBC = AES.new(key, AES.MODE_CBC, iv)
+    # also create an AES-ECB object for encrypting the IV
+    cipher_ECB = AES.new(key, AES.MODE_ECB)
+    # write out the encrypted IV and the padded and encrypted plaintext to the output file
+    ofile = open("tempencrypted/temp.file", "wb+")
+    ofile.write(cipher_ECB.encrypt(iv))
+    ofile.write(cipher_CBC.encrypt(padded_plaintext))
+    ofile.close()
+    files = {'file': open("tempencrypted/temp.file", 'rb')}
+    state["client_msn"] = state["client_msn"] + 1
+    data = {"client_msn": state["client_msn"], "fileID": fileID, "email": email, "key": sendable_key}
+    encrypted_data = encrypt_request_data(data)
+    print("uploading file to share")
+    r = requests.post("http://localhost:8000/share/", headers=encrypted_headers, data=encrypted_data, files=files).json()
+    os.remove("tempencrypted/temp.file")
     decrypted_r = decrypt_response_data(r['response'])
 
     if not check_server_msn(int(decrypted_r["server_msn"])):

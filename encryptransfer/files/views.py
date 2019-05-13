@@ -152,7 +152,7 @@ def api_my_files(request):
     decrypted_request_data = decrypt_request_data(request.data['data'])
     if not check_client_msn(user, decrypted_request_data):
         return protected_response(user, {'error': 'error'})
-    file_list = dict(user.file_set.all())
+    file_list = {"files": list(user.file_set.values())}
     return protected_response(user, file_list)
 
 
@@ -167,7 +167,7 @@ def api_my_access(request):
     decrypted_request_data = decrypt_request_data(request.data['data'])
     if not check_client_msn(user, decrypted_request_data):
         return protected_response(user, {'error': 'error'})
-    access_list = dict(user.accesscontroller_set.all())
+    access_list = {"access": list(user.accesscontroller_set.values())}
     return protected_response(user, access_list)
 
 
@@ -195,9 +195,10 @@ def api_upload(request):
 @permission_classes((AllowAny,))
 def api_download(request):
     user = custom_auth(request.headers["data"])
-    if not check_client_msn(request):
+    decrypted_request_data = decrypt_request_data(request.data['data'])
+    if not check_client_msn(user, decrypted_request_data):
         return protected_response(user, {'error': 'error'})
-    f = File.objects.get(id=request.data['fileID'])
+    f = File.objects.get(id=decrypted_request_data['fileID'])
     if f.owner == user:
         data = f.file.read() #in production this would instead be handled by Apache
         f.file.close()
@@ -230,9 +231,9 @@ def api_share(request):
     decrypted_request_data = decrypt_request_data(request.data['data'])
     if not check_client_msn(user, decrypted_request_data):
         return protected_response(user, {'error': 'error'})
-    f = File.objects.get(id=request.data['fileID'])
+    f = File.objects.get(id=decrypted_request_data['fileID'])
     if f.owner == user:
-        ac = AccessController(user=User.objects.get(email=decrypted_request_data["email"]), file=f)
+        ac = AccessController(user=User.objects.get(email=decrypted_request_data["email"]), original=f, file=request.FILES.get('file'), key=decrypted_request_data["key"])
         ac.save()
     return protected_response(user, {'success': 'True'})
 
@@ -248,8 +249,9 @@ def api_revoke(request):
     decrypted_request_data = decrypt_request_data(request.data['data'])
     if not check_client_msn(user, decrypted_request_data):
         return protected_response(user, {'error': 'error'})
-    f = File.objects.get(id=request.data['fileID'])
+    f = File.objects.get(id=decrypted_request_data['fileID'])
     if f.owner == user:
-        ac = AccessController.objects.get(user=User.objects.get(email=decrypted_request_data["email"]), file=f)
+        ac = AccessController.objects.get(user=User.objects.get(email=decrypted_request_data["email"]), original=f)
+        ac.file.delete()
         ac.delete()
     return protected_response(user, {'success': 'True'})
