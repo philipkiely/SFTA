@@ -119,10 +119,10 @@ def my_files(): ####
     headers = {"Authorization": state["token"]}
 
     encrypted_headers = encrypt_request_data(headers)
-    encrypted_data   = encrypt_request_data(data)
+    encrypted_data = encrypt_request_data(data)
     # print(encrypted_header, "\n", encrypted_data)
 
-    r = requests.post("http://localhost:8000/my_files/", headers=headers, data=encrypted_data).json()
+    r = requests.post("http://localhost:8000/my_files/", headers=encrypted_headers, data=encrypted_data).json()
 
     decrypted_r = decrypt_response_data(r['response'])
 
@@ -137,10 +137,10 @@ def my_access(): #####
     state["client_msn"] = state["client_msn"] + 1
     data = {"client_msn": state["client_msn"]}
     headers = {"Authorization": state["token"]}
-
+    encrypted_headers = encrypt_request_data(headers)
     encrypted_data = encrypt_request_data(data)
 
-    r = requests.post("http://localhost:8000/my_access/", headers=headers, data=encrypted_data).json()
+    r = requests.post("http://localhost:8000/my_access/", headers=encrypted_headers, data=encrypted_data).json()
 
     decrypted_r = decrypt_response_data(r['response'])
 
@@ -154,7 +154,6 @@ def upload(): #####
     global state
     state["client_msn"] = state["client_msn"] + 1
     data = {"client_msn": state["client_msn"]}
-
     encrypted_data = encrypt_request_data(data)
 
     print("path to file you want to upload")
@@ -178,8 +177,8 @@ def upload(): #####
     ofile.close()
     files = {'file': open("tempencrypted/" + path, 'rb')}
     headers = {"Authorization": state["token"]}
-
-    r = requests.post("http://localhost:8000/upload/", headers=headers, data=encrypted_data, files=files).json()
+    encrypted_headers = encrypt_request_data(headers)
+    r = requests.post("http://localhost:8000/upload/", headers=encrypted_headers, data=encrypted_data, files=files).json()
 
     decrypted_r = decrypt_response_data(r['response'])
 
@@ -197,7 +196,8 @@ def download():
     fileID = int(input())
     data = {"client_msn": state["client_msn"], "fileID": fileID}
     headers = {"Authorization": state["token"]}
-    r = requests.post("http://localhost:8000/download/", headers=headers, data=data, stream=True)
+    encrypted_headers = encrypt_request_data(headers)
+    r = requests.post("http://localhost:8000/download/", headers=encrypted_headers, data=data, stream=True)
     #if not check_server_msn(int(r["server_msn"])):
     #    return
     print("Save As:")
@@ -237,10 +237,10 @@ def share(): ####
     print("Email of user to share with")
     email = input()
     data = {"client_msn": state["client_msn"], "fileID": fileID, "email": email}
-
+    encrypted_headers = encrypt_request_data(headers)
     encrypted_data = encrypt_request_data(data)
 
-    r = requests.post("http://localhost:8000/share/", headers=headers, data=encrypted_data).json()
+    r = requests.post("http://localhost:8000/share/", headers=encrypted_headers, data=encrypted_data).json()
 
     decrypted_r = decrypt_response_data(r['response'])
 
@@ -259,10 +259,10 @@ def revoke(): #####
     print("Email of user to revoke from")
     email = input()
     data = {"client_msn": state["client_msn"], "fileID": fileID, "email": email}
-
+    encrypted_headers = encrypt_request_data(headers)
     encrypted_data = encrypt_request_data(data)
 
-    r = requests.post("http://localhost:8000/revoke/", headers=headers, data=encrypted_data).json()
+    r = requests.post("http://localhost:8000/revoke/", headers=encrypted_headers, data=encrypted_data).json()
 
     decrypted_r = decrypt_response_data(r['response'])
 

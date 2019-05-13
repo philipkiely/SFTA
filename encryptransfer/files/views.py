@@ -13,16 +13,9 @@ from django.conf import settings
 from .decorators import define_usage
 from .models import File, AccessController, Profile
 import mimetypes
-
 from Crypto.PublicKey import RSA
-from Crypto.Random import get_random_bytes
-from Crypto.Cipher import AES, PKCS1_OAEP
+from Crypto.Cipher import PKCS1_OAEP
 import ast
-
-
-
-#TODO: MAC on responses
-#TODO: Encrypt files
 
 
 def decrypt_request_data(request_data):
@@ -33,6 +26,7 @@ def decrypt_request_data(request_data):
     # Decrypt Request data from Client
     server_cipher = PKCS1_OAEP.new(server_priv_key)
     return ast.literal_eval(str(server_cipher.decrypt(bytes(ast.literal_eval(request_data))))[2:-1])
+
 
 def encrypt_response_data(response_dict):
     # Read in Client's Public Key
@@ -123,39 +117,43 @@ def api_signin(request):
     return Response({'response': encrypted_response_dict})
 
 
-
 #checking client msn
-def check_client_msn(request, decrypted_request_data): #### decrypt requests before calling this, change input to this to the encrypted version
-    if int(decrypted_request_data['client_msn']) <= request.user.profile.client_msn:
+def check_client_msn(user, decrypted_request_data): #### decrypt requests before calling this, change input to this to the encrypted version
+    if int(decrypted_request_data['client_msn']) <= user.profile.client_msn:
         return False
-    request.user.profile.client_msn = int(decrypted_request_data['client_msn'])
-    request.user.profile.save()
+    user.profile.client_msn = int(decrypted_request_data['client_msn'])
+    user.profile.save()
     return True
 
 
 #wrapper for Response, introduces sequence numbers #TODO encryption and mac
-def protected_response(request, data):
-    new_server_msn = request.user.profile.server_msn + 1
+def protected_response(user, data):
+    new_server_msn = user.profile.server_msn + 1
     data["server_msn"] = new_server_msn
-    request.user.profile.server_msn = new_server_msn
-    request.user.profile.save()
+    user.profile.server_msn = new_server_msn
+    user.profile.save()
     # Encrypt data
     # return Response(data)
     return Response({'response': encrypt_response_data(data)})
 
+
+def custom_auth(data):
+    return Token.objects.get(key=decrypt_request_data(data)['Authorization'][6:]).user        
+    
 
 #path('my_files/', views.api_my_files, name='api_my_files'),
 @ratelimit(key='ip', rate='1/s')
 @define_usage(params={'client_msn': 'Integer'}, returns={'file_metadata': 'Dict'})
 @api_view(['POST'])
 @authentication_classes((SessionAuthentication, BasicAuthentication, TokenAuthentication))
-@permission_classes((IsAuthenticated,))
+@permission_classes((AllowAny,))
 def api_my_files(request):
+    user = custom_auth(request.headers["data"])
     decrypted_request_data = decrypt_request_data(request.data['data'])
-    if not check_client_msn(request, decrypted_request_data):
-        return protected_response(request, {'error': 'error'})
-    file_list = dict(request.user.file_set.all())
-    return protected_response(request, file_list)
+    if not check_client_msn(user, decrypted_request_data):
+        return protected_response(user, {'error': 'error'})
+    file_list = dict(user.file_set.all())
+    return protected_response(user, file_list)
 
 
 #path('my_access/', views.api_my_access, name='api_my_access'),
@@ -163,13 +161,14 @@ def api_my_files(request):
 @define_usage(params={'client_msn': 'Integer'}, returns={'file_metadata': 'Dict'})
 @api_view(['POST'])
 @authentication_classes((SessionAuthentication, BasicAuthentication, TokenAuthentication))
-@permission_classes((IsAuthenticated,))
+@permission_classes((AllowAny,))
 def api_my_access(request):
+    user = custom_auth(request.headers["data"])
     decrypted_request_data = decrypt_request_data(request.data['data'])
-    if not check_client_msn(request, decrypted_request_data):
-        return protected_response(request, {'error': 'error'})
-    access_list = dict(request.user.accesscontroller_set.all())
-    return protected_response(request, access_list)
+    if not check_client_msn(user, decrypted_request_data):
+        return protected_response(user, {'error': 'error'})
+    access_list = dict(user.accesscontroller_set.all())
+    return protected_response(user, access_list)
 
 
 #path('upload/', views.api_upload, name='api_upload'),
@@ -177,14 +176,15 @@ def api_my_access(request):
 @define_usage(params={'file': 'File', 'client_msn': 'Integer'}, returns={'success': 'Boolean', 'fileID': 'String'})
 @api_view(['POST'])
 @authentication_classes((SessionAuthentication, BasicAuthentication, TokenAuthentication))
-@permission_classes((IsAuthenticated,))
+@permission_classes((AllowAny,))
 def api_upload(request):
+    user = custom_auth(request.headers["data"])
     decrypted_request_data = decrypt_request_data(request.data['data'])
-    if not check_client_msn(request, decrypted_request_data):
-        return protected_response(request, {'error': 'error'})
-    new_file = File(owner=request.user, file=request.FILES.get('file'))
+    if not check_client_msn(user, decrypted_request_data):
+        return protected_response(user, {'error': 'error'})
+    new_file = File(owner=user, file=request.FILES.get('file'))
     new_file.save()
-    return protected_response(request, {'success': 'True', 'fileID': new_file.id})
+    return protected_response(user, {'success': 'True', 'fileID': new_file.id})
 
 
 #path('download/', views.api_download, name='api_download'),
@@ -192,22 +192,23 @@ def api_upload(request):
 @define_usage(params={'fileID': 'Int', 'client_msn': 'Integer'}, returns={'file': 'File'})
 @api_view(['POST'])
 @authentication_classes((SessionAuthentication, BasicAuthentication, TokenAuthentication))
-@permission_classes((IsAuthenticated,))
+@permission_classes((AllowAny,))
 def api_download(request):
+    user = custom_auth(request.headers["data"])
     if not check_client_msn(request):
-        return protected_response(request, {'error': 'error'})
+        return protected_response(user, {'error': 'error'})
     f = File.objects.get(id=request.data['fileID'])
-    if f.owner == request.user:
+    if f.owner == user:
         data = f.file.read() #in production this would instead be handled by Apache
         f.file.close()
         response = HttpResponse(data, content_type=mimetypes.guess_type(settings.MEDIA_ROOT + f.file.name)[0])
         response['Content-Disposition'] = "attachment; filename={0}".format(f.file)
         response['Content-Length'] = f.file.size
         return response
-        #return protected_response(request, {'success': 'True', 'fileID': f.id})
+        #return protected_response(user, {'success': 'True', 'fileID': f.id})
     else:
         try:
-            ac = AccessController.objects.get(user=request.user, file=f)
+            ac = AccessController.objects.get(user=user, file=f)
             data = ac.file.file.read() #in production this would instead be handled by Apache
             ac.file.file.close()
             response = Response(data, content_type=mimetypes.guess_type(settings.MEDIA_ROOT + ac.file.file.name)[0])
@@ -215,7 +216,7 @@ def api_download(request):
             response['Content-Length'] = ac.file.file.size
             return response
         except:
-            return protected_response(request, {'success': 'False', 'fileID': 'You cannot access this file'})
+            return protected_response(user, {'success': 'False', 'fileID': 'You cannot access this file'})
 
 
 #path('share/', views.api_share, name='api_share'),
@@ -223,16 +224,17 @@ def api_download(request):
 @define_usage(params={'file_id': 'Int', 'file_key': 'String', 'email': 'String', 'client_msn': 'Integer'}, returns={'success': 'Boolean'})
 @api_view(['POST'])
 @authentication_classes((SessionAuthentication, BasicAuthentication, TokenAuthentication))
-@permission_classes((IsAuthenticated,))
+@permission_classes((AllowAny,))
 def api_share(request):
+    user = custom_auth(request.headers["data"])
     decrypted_request_data = decrypt_request_data(request.data['data'])
-    if not check_client_msn(request, decrypted_request_data):
-        return protected_response(request, {'error': 'error'})
+    if not check_client_msn(user, decrypted_request_data):
+        return protected_response(user, {'error': 'error'})
     f = File.objects.get(id=request.data['fileID'])
-    if f.owner == request.user:
+    if f.owner == user:
         ac = AccessController(user=User.objects.get(email=decrypted_request_data["email"]), file=f)
         ac.save()
-    return protected_response(request, {'success': 'True'})
+    return protected_response(user, {'success': 'True'})
 
 
 #path('revoke/', views.api_revoke, name='api_revoke'),
@@ -240,13 +242,14 @@ def api_share(request):
 @define_usage(params={'file_id': 'Int', 'email': 'String', 'client_msn': 'Integer'}, returns={'success': 'Boolean'})
 @api_view(['POST'])
 @authentication_classes((SessionAuthentication, BasicAuthentication, TokenAuthentication))
-@permission_classes((IsAuthenticated,))
+@permission_classes((AllowAny,))
 def api_revoke(request):
+    user = custom_auth(request.headers["data"])
     decrypted_request_data = decrypt_request_data(request.data['data'])
-    if not check_client_msn(request, decrypted_request_data):
-        return protected_response(request, {'error': 'error'})
+    if not check_client_msn(user, decrypted_request_data):
+        return protected_response(user, {'error': 'error'})
     f = File.objects.get(id=request.data['fileID'])
-    if f.owner == request.user:
+    if f.owner == user:
         ac = AccessController.objects.get(user=User.objects.get(email=decrypted_request_data["email"]), file=f)
         ac.delete()
-    return protected_response(request, {'success': 'True'})
+    return protected_response(user, {'success': 'True'})
