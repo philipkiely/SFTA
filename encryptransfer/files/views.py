@@ -125,10 +125,10 @@ def api_signin(request):
 
 
 #checking client msn
-def check_client_msn(request):
-    if int(request.data['client_msn']) <= request.user.profile.client_msn:
+def check_client_msn(request, decrypted_request_data): #### decrypt requests before calling this, change input to this to the encrypted version
+    if int(decrypted_request_data['client_msn']) <= request.user.profile.client_msn:
         return False
-    request.user.profile.client_msn = int(request.data['client_msn'])
+    request.user.profile.client_msn = int(decrypted_request_data['client_msn'])
     request.user.profile.save()
     return True
 
@@ -139,7 +139,9 @@ def protected_response(request, data):
     data["server_msn"] = new_server_msn
     request.user.profile.server_msn = new_server_msn
     request.user.profile.save()
-    return Response(data)
+    # Encrypt data
+    # return Response(data)
+    return Response({'response': encrypt_response_data(data)})
 
 
 #path('my_files/', views.api_my_files, name='api_my_files'),
@@ -149,7 +151,8 @@ def protected_response(request, data):
 @authentication_classes((SessionAuthentication, BasicAuthentication, TokenAuthentication))
 @permission_classes((IsAuthenticated,))
 def api_my_files(request):
-    if not check_client_msn(request):
+    decrypted_request_data = decrypt_request_data(request.data['data'])
+    if not check_client_msn(request, decrypted_request_data):
         return protected_response(request, {'error': 'error'})
     file_list = dict(request.user.file_set.all())
     return protected_response(request, file_list)
@@ -162,7 +165,8 @@ def api_my_files(request):
 @authentication_classes((SessionAuthentication, BasicAuthentication, TokenAuthentication))
 @permission_classes((IsAuthenticated,))
 def api_my_access(request):
-    if not check_client_msn(request):
+    decrypted_request_data = decrypt_request_data(request.data['data'])
+    if not check_client_msn(request, decrypted_request_data):
         return protected_response(request, {'error': 'error'})
     access_list = dict(request.user.accesscontroller_set.all())
     return protected_response(request, access_list)
@@ -175,7 +179,8 @@ def api_my_access(request):
 @authentication_classes((SessionAuthentication, BasicAuthentication, TokenAuthentication))
 @permission_classes((IsAuthenticated,))
 def api_upload(request):
-    if not check_client_msn(request):
+    decrypted_request_data = decrypt_request_data(request.data['data'])
+    if not check_client_msn(request, decrypted_request_data):
         return protected_response(request, {'error': 'error'})
     new_file = File(owner=request.user, file=request.FILES.get('file'))
     new_file.save()
@@ -220,11 +225,12 @@ def api_download(request):
 @authentication_classes((SessionAuthentication, BasicAuthentication, TokenAuthentication))
 @permission_classes((IsAuthenticated,))
 def api_share(request):
-    if not check_client_msn(request):
+    decrypted_request_data = decrypt_request_data(request.data['data'])
+    if not check_client_msn(request, decrypted_request_data):
         return protected_response(request, {'error': 'error'})
     f = File.objects.get(id=request.data['fileID'])
     if f.owner == request.user:
-        ac = AccessController(user=User.objects.get(email=request.data["email"]), file=f)
+        ac = AccessController(user=User.objects.get(email=decrypted_request_data["email"]), file=f)
         ac.save()
     return protected_response(request, {'success': 'True'})
 
@@ -236,10 +242,11 @@ def api_share(request):
 @authentication_classes((SessionAuthentication, BasicAuthentication, TokenAuthentication))
 @permission_classes((IsAuthenticated,))
 def api_revoke(request):
-    if not check_client_msn(request):
+    decrypted_request_data = decrypt_request_data(request.data['data'])
+    if not check_client_msn(request, decrypted_request_data):
         return protected_response(request, {'error': 'error'})
     f = File.objects.get(id=request.data['fileID'])
     if f.owner == request.user:
-        ac = AccessController.objects.get(user=User.objects.get(email=request.data["email"]), file=f)
+        ac = AccessController.objects.get(user=User.objects.get(email=decrypted_request_data["email"]), file=f)
         ac.delete()
     return protected_response(request, {'success': 'True'})

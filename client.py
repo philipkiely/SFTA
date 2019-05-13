@@ -6,6 +6,7 @@ from Crypto.Cipher import AES, PKCS1_OAEP
 from Crypto.Util import Padding
 from Crypto import Random
 
+
 def encrypt_request_data(request_data):
     # Load Server's Public Key
     file_in = open("server_pub_key.pem", "r")
@@ -111,34 +112,51 @@ def signin():
 
 
 #path('my_files/', views.api_my_files, name='api_my_files'),
-def my_files():
+def my_files(): ####
     global state
     state["client_msn"] = state["client_msn"] + 1
     data = {"client_msn": state["client_msn"]}
     headers = {"Authorization": state["token"]}
-    r = requests.post("http://localhost:8000/my_files/", headers=headers, data=data).json()
-    if not check_server_msn(int(r["server_msn"])):
+
+    encrypted_headers = encrypt_request_data(headers)
+    encrypted_data   = encrypt_request_data(data)
+    # print(encrypted_header, "\n", encrypted_data)
+
+    r = requests.post("http://localhost:8000/my_files/", headers=headers, data=encrypted_data).json()
+
+    decrypted_r = decrypt_response_data(r['response'])
+
+    if not check_server_msn(int(decrypted_r["server_msn"])):
         return
-    print(r)
+    print(decrypted_r)
 
 
 #path('my_access/', views.api_my_access, name='api_my_access'),
-def my_access():
+def my_access(): #####
     global state
     state["client_msn"] = state["client_msn"] + 1
     data = {"client_msn": state["client_msn"]}
     headers = {"Authorization": state["token"]}
-    r = requests.post("http://localhost:8000/my_access/", headers=headers, data=data).json()
-    if not check_server_msn(int(r["server_msn"])):
+
+    encrypted_data = encrypt_request_data(data)
+
+    r = requests.post("http://localhost:8000/my_access/", headers=headers, data=encrypted_data).json()
+
+    decrypted_r = decrypt_response_data(r['response'])
+
+    if not check_server_msn(int(decrypted_r["server_msn"])):
         return
-    print(r)
+    print(decrypted_r)
 
 
 #path('upload/', views.api_upload, name='api_upload'),
-def upload():
+def upload(): #####
     global state
     state["client_msn"] = state["client_msn"] + 1
     data = {"client_msn": state["client_msn"]}
+
+    encrypted_data = encrypt_request_data(data)
+
     print("path to file you want to upload")
     path = input()
     ifile = open(path, 'rb')
@@ -160,11 +178,15 @@ def upload():
     ofile.close()
     files = {'file': open("tempencrypted/" + path, 'rb')}
     headers = {"Authorization": state["token"]}
-    r = requests.post("http://localhost:8000/upload/", headers=headers, data=data, files=files).json()
+
+    r = requests.post("http://localhost:8000/upload/", headers=headers, data=encrypted_data, files=files).json()
+
+    decrypted_r = decrypt_response_data(r['response'])
+
     os.remove("tempencrypted/" + path)
-    if not check_server_msn(int(r["server_msn"])):
+    if not check_server_msn(int(decrypted_r["server_msn"])):
         return
-    print(r)
+    print(decrypted_r)
 
 
 #path('download/', views.api_download, name='api_download'),
@@ -206,7 +228,7 @@ def download():
 
 
 #path('share/', views.api_share, name='api_share'),
-def share():
+def share(): ####
     global state
     state["client_msn"] = state["client_msn"] + 1
     headers = {"Authorization": state["token"]}
@@ -215,14 +237,20 @@ def share():
     print("Email of user to share with")
     email = input()
     data = {"client_msn": state["client_msn"], "fileID": fileID, "email": email}
-    r = requests.post("http://localhost:8000/share/", headers=headers, data=data).json()
-    if not check_server_msn(int(r["server_msn"])):
+
+    encrypted_data = encrypt_request_data(data)
+
+    r = requests.post("http://localhost:8000/share/", headers=headers, data=encrypted_data).json()
+
+    decrypted_r = decrypt_response_data(r['response'])
+
+    if not check_server_msn(int(decrypted_r["server_msn"])):
         return
-    print(r)
+    print(decrypted_r)
 
 
 #path('revoke/', views.api_revoke, name='api_revoke'),
-def revoke():
+def revoke(): #####
     global state
     state["client_msn"] = state["client_msn"] + 1
     headers = {"Authorization": state["token"]}
@@ -231,10 +259,16 @@ def revoke():
     print("Email of user to revoke from")
     email = input()
     data = {"client_msn": state["client_msn"], "fileID": fileID, "email": email}
-    r = requests.post("http://localhost:8000/revoke/", headers=headers, data=data).json()
-    if not check_server_msn(int(r["server_msn"])):
+
+    encrypted_data = encrypt_request_data(data)
+
+    r = requests.post("http://localhost:8000/revoke/", headers=headers, data=encrypted_data).json()
+
+    decrypted_r = decrypt_response_data(r['response'])
+
+    if not check_server_msn(int(decrypted_r["server_msn"])):
         return
-    print(r)
+    print(decrypted_r)
 
 
 def client():
