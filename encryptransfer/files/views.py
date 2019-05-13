@@ -1,4 +1,4 @@
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from rest_framework.authentication import SessionAuthentication, BasicAuthentication, TokenAuthentication
@@ -138,8 +138,8 @@ def protected_response(user, data):
 
 
 def custom_auth(data):
-    return Token.objects.get(key=decrypt_request_data(data)['Authorization'][6:]).user        
-    
+    return Token.objects.get(key=decrypt_request_data(data)['Authorization'][6:]).user
+
 
 #path('my_files/', views.api_my_files, name='api_my_files'),
 @ratelimit(key='ip', rate='1/s')
