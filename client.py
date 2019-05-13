@@ -278,17 +278,24 @@ def share(): ####
     iv = Random.get_random_bytes(AES.block_size)
     sendable_key = ''.join(random.SystemRandom().choice('abcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*(-_=+)') for i in range(16))
     key = sendable_key.encode('utf-8')
+    file_in = open("client_pub_key_{}.pem".format(username), "r")
+    client_key = RSA.import_key(file_in.read())
+    file_in.close()
+    client_cipher = PKCS1_OAEP.new(client_key)
+    ofile = open("tempencrypted/temp.file", "w+")
+    ofile.write(str(list(client_cipher.encrypt(key))))
+    ofile.close()
     cipher_CBC = AES.new(key, AES.MODE_CBC, iv)
     # also create an AES-ECB object for encrypting the IV
     cipher_ECB = AES.new(key, AES.MODE_ECB)
     # write out the encrypted IV and the padded and encrypted plaintext to the output file
-    ofile = open("tempencrypted/temp.file", "wb+")
+    ofile = open("tempencrypted/temp.key", "wb+")
     ofile.write(cipher_ECB.encrypt(iv))
     ofile.write(cipher_CBC.encrypt(padded_plaintext))
     ofile.close()
-    files = {'file': open("tempencrypted/temp.file", 'rb')}
+    files = {'file': open("tempencrypted/temp.file", 'rb'), 'keyfile': open("tempencrypted/temp.key", 'rb')}
     state["client_msn"] = state["client_msn"] + 1
-    data = {"client_msn": state["client_msn"], "fileID": fileID, "username": username, "key": sendable_key}
+    data = {"client_msn": state["client_msn"], "fileID": fileID, "username": username}
     encrypted_data = encrypt_request_data(data)
     print("uploading file to share")
     r = requests.post("http://localhost:8000/share/", headers=encrypted_headers, data=encrypted_data, files=files).json()

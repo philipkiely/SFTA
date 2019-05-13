@@ -209,12 +209,14 @@ def api_download(request):
         #return protected_response(user, {'success': 'True', 'fileID': f.id})
     else:
         try:
-            ac = AccessController.objects.get(user=user, file=f)
-            data = ac.file.file.read() #in production this would instead be handled by Apache
-            ac.file.file.close()
-            response = Response(data, content_type=mimetypes.guess_type(settings.MEDIA_ROOT + ac.file.file.name)[0])
-            response['Content-Disposition'] = "attachment; filename={0}".format(ac.file.file)
-            response['Content-Length'] = ac.file.file.size
+            ac = AccessController.objects.get(user=user, original=f)
+            data = ac.file.read() #in production this would instead be handled by Apache
+            ac.file.close()
+            key = ac.key.read() #in production this would instead be handled by Apache
+            ac.key.close()
+            response = Response({"file": data, "key": key}, content_type=mimetypes.guess_type(settings.MEDIA_ROOT + ac.original.name)[0])
+            response['Content-Disposition'] = "attachment; filename={0}".format(ac.file)
+            response['Content-Length'] = ac.file.size
             return response
         except:
             return protected_response(user, {'success': 'False', 'fileID': 'You cannot access this file'})
@@ -233,7 +235,7 @@ def api_share(request):
         return protected_response(user, {'error': 'error'})
     f = File.objects.get(id=decrypted_request_data['fileID'])
     if f.owner == user:
-        ac = AccessController(user=User.objects.get(username=decrypted_request_data["username"]), original=f, file=request.FILES.get('file'), key=decrypted_request_data["key"])
+        ac = AccessController(user=User.objects.get(username=decrypted_request_data["username"]), original=f, file=request.FILES.get('file'), key=request.FILES.get('keyfile'))
         ac.save()
     return protected_response(user, {'success': 'True'})
 

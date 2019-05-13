@@ -11,7 +11,7 @@ class AccessController(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     original = models.ForeignKey(File, on_delete=models.CASCADE)
     file = models.FileField(upload_to='files/')
-    key = models.CharField(max_length=150)
+    key = models.FileField(upload_to='files/')
 
 
 class Profile(models.Model):
