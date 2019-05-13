@@ -6,6 +6,7 @@ import random
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import AES, PKCS1_OAEP
 from Crypto.Util import Padding
+from Crypto.Hash import SHA256
 from Crypto import Random
 
 
@@ -19,7 +20,8 @@ def encrypt_request_data(request_data):
     request_dict = (str(request_data)).encode("utf-8")
     server_cipher = PKCS1_OAEP.new(server_key)
     encrypted_request_dict = str(list(server_cipher.encrypt(request_dict)))
-    return {"data": encrypted_request_dict}
+    h = SHA256.new(encrypted_request_dict.encode('utf-8'))
+    return {"data": encrypted_request_dict, "hash": str(list(h.digest()))}
 
 
 def decrypt_response_data(response_data):
@@ -30,8 +32,15 @@ def decrypt_response_data(response_data):
 
     # Decrypt Response data from Server
     client_cipher = PKCS1_OAEP.new(client_priv_key)
-    return ast.literal_eval(str(client_cipher.decrypt(bytes(ast.literal_eval(response_data))))[2:-1])
-
+    data = ast.literal_eval(str(client_cipher.decrypt(bytes(ast.literal_eval(response_data))))[2:-1])
+    #hash = bytes(ast.literal_eval(response_data["hash"]))
+    #new = SHA256.new(bytes(ast.literal_eval(response_data["data"]))).digest()
+    #if hash == bytes(ast.literal_eval(response_data["hash"])):
+    #    return data
+    #else:
+    #    print("Many things can go wrong here")
+    #    return
+    return data
 
 def save_state():
     global state
@@ -134,7 +143,6 @@ def my_files(): ####
 
     encrypted_headers = encrypt_request_data(headers)
     encrypted_data = encrypt_request_data(data)
-    # print(encrypted_header, "\n", encrypted_data)
 
     r = requests.post("http://localhost:8000/my_files/", headers=encrypted_headers, data=encrypted_data).json()
 

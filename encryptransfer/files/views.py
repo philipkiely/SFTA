@@ -15,6 +15,7 @@ from .models import File, AccessController, Profile
 import mimetypes
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import PKCS1_OAEP
+from Crypto.Hash import SHA256
 import ast
 
 
@@ -25,7 +26,14 @@ def decrypt_request_data(request_data):
     file_in.close()
     # Decrypt Request data from Client
     server_cipher = PKCS1_OAEP.new(server_priv_key)
-    return ast.literal_eval(str(server_cipher.decrypt(bytes(ast.literal_eval(request_data))))[2:-1])
+    data = ast.literal_eval(str(server_cipher.decrypt(bytes(ast.literal_eval(request_data["data"]))))[2:-1])
+    hash = bytes(ast.literal_eval(request_data["hash"]))
+    new = SHA256.new(bytes(ast.literal_eval(request_data["data"]))).digest()
+    if hash == bytes(ast.literal_eval(request_data["hash"])):
+        return data
+    else:
+        print("Many things can go wrong here")
+        return
 
 
 def encrypt_response_data(response_dict, username):
@@ -35,6 +43,7 @@ def encrypt_response_data(response_dict, username):
     file_in.close()
 
     # Encrypt Response for Client
+    #response_dict["hash"] = SHA256.new(str(response_dict).encode('utf-8'))
     response_dict = (str(response_dict)).encode("utf-8")
     client_cipher = PKCS1_OAEP.new(client_key)
     return str(list(client_cipher.encrypt(response_dict)))
@@ -62,7 +71,7 @@ def api_index(request):
 @permission_classes((AllowAny,))
 def api_signup(request):
 
-    decrypted_request_data = decrypt_request_data(request.data['data'])
+    decrypted_request_data = decrypt_request_data(request.data)
 
     try:
         username = decrypted_request_data['username']
@@ -96,7 +105,7 @@ def api_signup(request):
 @permission_classes((AllowAny,))
 def api_signin(request):
 
-    decrypted_request_data = decrypt_request_data(request.data['data'])
+    decrypted_request_data = decrypt_request_data(request.data)
 
     try:
         username = decrypted_request_data['username']
@@ -148,8 +157,8 @@ def custom_auth(data):
 @authentication_classes((SessionAuthentication, BasicAuthentication, TokenAuthentication))
 @permission_classes((AllowAny,))
 def api_my_files(request):
-    user = custom_auth(request.headers["data"])
-    decrypted_request_data = decrypt_request_data(request.data['data'])
+    user = custom_auth(request.headers)
+    decrypted_request_data = decrypt_request_data(request.data)
     if not check_client_msn(user, decrypted_request_data):
         return protected_response(user, {'error': 'error'})
     file_list = {"files": list(user.file_set.values())}
@@ -163,8 +172,8 @@ def api_my_files(request):
 @authentication_classes((SessionAuthentication, BasicAuthentication, TokenAuthentication))
 @permission_classes((AllowAny,))
 def api_my_access(request):
-    user = custom_auth(request.headers["data"])
-    decrypted_request_data = decrypt_request_data(request.data['data'])
+    user = custom_auth(request.headers)
+    decrypted_request_data = decrypt_request_data(request.data)
     if not check_client_msn(user, decrypted_request_data):
         return protected_response(user, {'error': 'error'})
     access_list = {"access": list(user.accesscontroller_set.values())}
@@ -178,8 +187,8 @@ def api_my_access(request):
 @authentication_classes((SessionAuthentication, BasicAuthentication, TokenAuthentication))
 @permission_classes((AllowAny,))
 def api_upload(request):
-    user = custom_auth(request.headers["data"])
-    decrypted_request_data = decrypt_request_data(request.data['data'])
+    user = custom_auth(request.headers)
+    decrypted_request_data = decrypt_request_data(request.data)
     if not check_client_msn(user, decrypted_request_data):
         return protected_response(user, {'error': 'error'})
     new_file = File(owner=user, file=request.FILES.get('file'))
@@ -194,8 +203,8 @@ def api_upload(request):
 @authentication_classes((SessionAuthentication, BasicAuthentication, TokenAuthentication))
 @permission_classes((AllowAny,))
 def api_download(request):
-    user = custom_auth(request.headers["data"])
-    decrypted_request_data = decrypt_request_data(request.data['data'])
+    user = custom_auth(request.headers)
+    decrypted_request_data = decrypt_request_data(request.data)
     if not check_client_msn(user, decrypted_request_data):
         return protected_response(user, {'error': 'error'})
     f = File.objects.get(id=decrypted_request_data['fileID'])
@@ -229,8 +238,8 @@ def api_download(request):
 @authentication_classes((SessionAuthentication, BasicAuthentication, TokenAuthentication))
 @permission_classes((AllowAny,))
 def api_share(request):
-    user = custom_auth(request.headers["data"])
-    decrypted_request_data = decrypt_request_data(request.data['data'])
+    user = custom_auth(request.headers)
+    decrypted_request_data = decrypt_request_data(request.data)
     if not check_client_msn(user, decrypted_request_data):
         return protected_response(user, {'error': 'error'})
     f = File.objects.get(id=decrypted_request_data['fileID'])
@@ -247,8 +256,8 @@ def api_share(request):
 @authentication_classes((SessionAuthentication, BasicAuthentication, TokenAuthentication))
 @permission_classes((AllowAny,))
 def api_revoke(request):
-    user = custom_auth(request.headers["data"])
-    decrypted_request_data = decrypt_request_data(request.data['data'])
+    user = custom_auth(request.headers)
+    decrypted_request_data = decrypt_request_data(request.data)
     if not check_client_msn(user, decrypted_request_data):
         return protected_response(user, {'error': 'error'})
     f = File.objects.get(id=decrypted_request_data['fileID'])
